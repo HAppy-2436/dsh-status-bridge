@@ -111,7 +111,10 @@ DSH_STATUS_DIR=/tmp/dsh-status-dev node test/dev-host.mjs
 
 ## 发布
 
-由 `.github/workflows/publish.yml` 在 tag 上发布：
+由 `.github/workflows/publish.yml` 在 tag 上发布（npm **Trusted Publishing / OIDC**，
+不需要长期 token，也不需要 OTP；首次使用前需在 npmjs.com 包设置里配置
+Trusted Publisher：GitHub Actions + 仓库 `HAppy-2436/dsh-status-bridge` +
+workflow `publish.yml` + 允许 `npm publish`）：
 
 ```bash
 npm version patch --no-git-tag-version
@@ -120,8 +123,8 @@ git tag v0.1.1
 git push origin main --tags
 ```
 
-workflow 会先跑校验和测试，再用 `NPM_TOKEN` secret 执行
-`npm publish --access public --provenance`；不要在本地手动 publish。
+workflow 会先跑校验和测试，然后用 OIDC 短期令牌执行
+`npm publish --access public --provenance`（自动生成 provenance）；不要在本地手动 publish。
 
 ## 许可证
 

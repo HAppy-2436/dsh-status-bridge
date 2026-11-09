@@ -125,7 +125,14 @@ first.
 
 ## Publishing
 
-Releases are published from tags by `.github/workflows/publish.yml`:
+Releases are published from tags by `.github/workflows/publish.yml` using npm
+**Trusted Publishing (OIDC)** — no long-lived token, no OTP:
+
+1. Configure the package's Trusted Publisher on npmjs.com once
+   (**Settings → Trusted Publisher**): GitHub Actions, owner `HAppy-2436`,
+   repository `dsh-status-bridge`, workflow filename `publish.yml`, allow
+   `npm publish`.
+2. Then push a version tag:
 
 ```bash
 npm version patch --no-git-tag-version
@@ -134,8 +141,9 @@ git tag v0.1.1
 git push origin main --tags
 ```
 
-The workflow runs the checks, then `npm publish --access public --provenance`
-using the `NPM_TOKEN` repository secret. It never publishes from a local machine.
+The workflow runs the checks and publishes with a short-lived OIDC token
+(`id-token: write`) plus automatic provenance. It never publishes from a local
+machine.
 
 ## License
 
