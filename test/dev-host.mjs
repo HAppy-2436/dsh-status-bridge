@@ -62,32 +62,32 @@ const bridgeFile = path.join(process.env.DSH_STATUS_DIR || path.join(homedir(), 
 const bridge = JSON.parse(await readFile(bridgeFile, 'utf8'))
 const base = `http://127.0.0.1:${bridge.port}`
 
-// 模拟一次「homebrew 会话被用户停止」的 turn/end，Host 会把未读映射为已停止
-listeners.get('session/event')?.({ id: 'session-homebrew' }, { type: 'turn/end', data: { reason: { kind: 'aborted' } } })
+// 模拟一次「example-tools 会话被用户停止」的 turn/end，Host 会把未读映射为已停止
+listeners.get('session/event')?.({ id: 'session-example-e' }, { type: 'turn/end', data: { reason: { kind: 'aborted' } } })
 
 const snapshot = {
   version: 1,
   sessions: [
     {
-      id: 'session-erhu', title: '选哪种调音方案？', workspaceId: 'w-erhu', workspaceTitle: 'erhu',
+      id: 'session-example-a', title: '示例问题', workspaceId: 'w-example-app', workspaceTitle: 'example-app',
       running: false, unread: false,
-      pending: { kind: 'question', questions: [{ title: '选哪种调音方案？' }] },
+      pending: { kind: 'question', questions: [{ title: '示例问题' }] },
       updatedAt: Date.now() - 60_000,
     },
     {
-      id: 'session-dsh', title: '实现菜单栏图标', workspaceId: 'w-dsh-status', workspaceTitle: 'dsh-status',
+      id: 'session-example-b', title: '实现设置页', workspaceId: 'w-example-app', workspaceTitle: 'example-app',
       running: true, unread: false, pending: null, updatedAt: Date.now() - 1_000,
     },
     {
-      id: 'session-stability', title: '测试出口节点', workspaceId: 'w-stability', workspaceTitle: 'stability',
+      id: 'session-example-c', title: '运行回归测试', workspaceId: 'w-example-lab', workspaceTitle: 'example-lab',
       running: true, unread: false, pending: null, updatedAt: Date.now() - 2_000,
     },
     {
-      id: 'session-protocol', title: '写桥接协议', workspaceId: 'w-dsh-status', workspaceTitle: 'dsh-status',
+      id: 'session-example-d', title: '编写接入文档', workspaceId: 'w-example-app', workspaceTitle: 'example-app',
       running: false, unread: true, pending: null, updatedAt: Date.now() - 9 * 60_000,
     },
     {
-      id: 'session-homebrew', title: '梳理 homebrew 配置', workspaceId: 'w-homebrew', workspaceTitle: 'homebrew',
+      id: 'session-example-e', title: '整理配置清单', workspaceId: 'w-example-tools', workspaceTitle: 'example-tools',
       running: false, unread: true, pending: null, updatedAt: Date.now() - 42 * 60_000,
     },
   ],

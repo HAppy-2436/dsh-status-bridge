@@ -36,7 +36,7 @@ test('Client 半：聚合快照 + 过滤 + 长轮询跳转', async () => {
     const module = captured.module.factory()
 
     const sessionStatus = new Map([
-      ['session-1', { running: false, completionUnread: false, pendingInteraction: { kind: 'question', questions: [{ title: '选哪种调音方案？' }] } }],
+      ['session-1', { running: false, completionUnread: false, pendingInteraction: { kind: 'question', questions: [{ title: '示例问题' }] } }],
       ['session-2', { running: true, completionUnread: false, pendingInteraction: null }],
       ['session-3', { running: false, completionUnread: true, pendingInteraction: null }],
       ['session-4', { running: false, completionUnread: false, pendingInteraction: null }],
@@ -44,17 +44,17 @@ test('Client 半：聚合快照 + 过滤 + 长轮询跳转', async () => {
       ['session-6', { running: false, completionUnread: true, pendingInteraction: null }],
     ])
     const sessionItems = [
-      { sessionId: 'session-1', title: '选调音方案', cwd: '/Users/x/erhu', updatedAt: 10 },
+      { sessionId: 'session-1', title: '示例问题', cwd: '/Users/x/example-app', updatedAt: 10 },
       { sessionId: 'session-2', title: '', cwd: '/Users/x/dsh-status', updatedAt: 20 },
       { sessionId: 'session-3', title: '写协议', cwd: '/Users/x/dsh-status', updatedAt: 30 },
-      { sessionId: 'session-4', title: '空闲会话', cwd: '/Users/x/stability', updatedAt: 40 },
-      { sessionId: 'session-5', title: '空白会话', cwd: '/Users/x/stability', updatedAt: 50, blank: true },
+      { sessionId: 'session-4', title: '空闲会话', cwd: '/Users/x/example-lab', updatedAt: 40 },
+      { sessionId: 'session-5', title: '空白会话', cwd: '/Users/x/example-lab', updatedAt: 50, blank: true },
       { sessionId: 'session-6', title: '子会话', cwd: '/Users/x/dsh-status', updatedAt: 60, parentSessionId: 'session-2' },
     ]
     const workspaceItems = [
-      { workspaceId: 'w-erhu', title: 'erhu', sessionIds: ['session-1'] },
+      { workspaceId: 'w-example-app', title: 'example-app', sessionIds: ['session-1'] },
       { workspaceId: 'w-dsh', title: 'dsh-status', sessionIds: ['session-2', 'session-3', 'session-5', 'session-6'] },
-      { workspaceId: 'w-stability', title: 'stability', sessionIds: ['session-4'] },
+      { workspaceId: 'w-example-lab', title: 'example-lab', sessionIds: ['session-4'] },
     ]
 
     const cleanups = []
@@ -85,9 +85,9 @@ test('Client 半：聚合快照 + 过滤 + 长轮询跳转', async () => {
 
     assert.equal(byId.get('session-1').running, false)
     assert.equal(byId.get('session-1').unread, false)
-    assert.deepEqual(byId.get('session-1').pending, { kind: 'question', summary: '选哪种调音方案？' })
-    assert.equal(byId.get('session-1').workspaceId, 'w-erhu')
-    assert.equal(byId.get('session-1').workspaceTitle, 'erhu')
+    assert.deepEqual(byId.get('session-1').pending, { kind: 'question', summary: '示例问题' })
+    assert.equal(byId.get('session-1').workspaceId, 'w-example-app')
+    assert.equal(byId.get('session-1').workspaceTitle, 'example-app')
 
     assert.equal(byId.get('session-2').running, true)
     assert.equal(byId.get('session-2').workspaceTitle, 'dsh-status')

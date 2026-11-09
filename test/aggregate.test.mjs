@@ -22,8 +22,8 @@ test('statusOf：优先级与 turn 结果', () => {
 
 test('summarizePending：问题 / 计划审阅 / 审批 / 未知形状', () => {
   assert.deepEqual(
-    summarizePending({ kind: 'question', questions: [{ title: '选哪种调音方案？' }] }),
-    { kind: 'question', summary: '选哪种调音方案？' }
+    summarizePending({ kind: 'question', questions: [{ title: '示例问题' }] }),
+    { kind: 'question', summary: '示例问题' }
   )
   assert.deepEqual(
     summarizePending({ kind: 'plan-review', questions: [{ detail: '计划：先做 A 再做 B' }] }),
@@ -42,8 +42,8 @@ test('buildBridgeState：合并、排序、计数与 since 稳定', () => {
     version: 1,
     sessions: [
       { id: 's1', title: '空', running: false, unread: false, pending: null, updatedAt: 1 },
-      { id: 's2', title: '跑', workspaceId: 'w', workspaceTitle: 'erhu', running: true, unread: false, pending: null, updatedAt: 20 },
-      { id: 's3', title: '问', workspaceId: 'w', workspaceTitle: 'erhu', running: false, unread: false, pending: { kind: 'question', questions: [{ title: '选哪个？' }] }, updatedAt: 30 },
+      { id: 's2', title: '跑', workspaceId: 'w', workspaceTitle: 'example-app', running: true, unread: false, pending: null, updatedAt: 20 },
+      { id: 's3', title: '问', workspaceId: 'w', workspaceTitle: 'example-app', running: false, unread: false, pending: { kind: 'question', questions: [{ title: '选哪个？' }] }, updatedAt: 30 },
       { id: 's4', title: '完', running: false, unread: true, pending: null, updatedAt: 40 },
       { id: 's5', title: '停', running: false, unread: true, pending: null, updatedAt: 50 },
     ],

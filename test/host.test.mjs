@@ -132,9 +132,9 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     const snapshot = {
       version: 1,
       sessions: [
-        { id: 's-waiting', title: '选方案', workspaceId: 'w1', workspaceTitle: 'erhu', running: false, unread: false, pending: { kind: 'question', questions: [{ title: '选哪种调音方案？' }] }, updatedAt: 1 },
-        { id: 's-running', title: '跑测试', workspaceId: 'w1', workspaceTitle: 'erhu', running: true, unread: false, pending: null, updatedAt: 2 },
-        { id: 's-unread', title: '写协议', workspaceId: 'w2', workspaceTitle: 'dsh-status', running: false, unread: true, pending: null, updatedAt: 3 },
+        { id: 's-waiting', title: '选方案', workspaceId: 'w1', workspaceTitle: 'example-app', running: false, unread: false, pending: { kind: 'question', questions: [{ title: '示例问题' }] }, updatedAt: 1 },
+        { id: 's-running', title: '跑测试', workspaceId: 'w1', workspaceTitle: 'example-app', running: true, unread: false, pending: null, updatedAt: 2 },
+        { id: 's-unread', title: '写协议', workspaceId: 'w2', workspaceTitle: 'example-app', running: false, unread: true, pending: null, updatedAt: 3 },
         { id: 's-idle', title: '空闲', running: false, unread: false, pending: null, updatedAt: 4 },
       ],
     }
@@ -151,7 +151,7 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.deepEqual(merged.body.counts, { waiting: 1, running: 1, completed: 1, stopped: 0, attention: 2 })
     const byId = new Map(merged.body.sessions.map((session) => [session.id, session]))
     assert.equal(byId.get('s-waiting').status, 'waiting')
-    assert.deepEqual(byId.get('s-waiting').pending, { kind: 'question', summary: '选哪种调音方案？' })
+    assert.deepEqual(byId.get('s-waiting').pending, { kind: 'question', summary: '示例问题' })
     assert.equal(byId.get('s-running').status, 'running')
     assert.equal(byId.get('s-unread').status, 'completed')
     assert.equal(byId.has('s-idle'), false)

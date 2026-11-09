@@ -75,7 +75,7 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
 ```jsonc
 {
   "id": "session-7ca13994-...",
-  "title": "实现菜单栏图标",                 // 空则用 "未命名会话"
+  "title": "示例会话标题",                 // 空则用 "未命名会话"
   "workspaceId": "35084b06-...",
   "workspaceTitle": "dsh-status",
   "status": "waiting",                     // waiting | running | completed | stopped
@@ -89,7 +89,7 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
 `pending`：
 
 ```jsonc
-{ "kind": "question" | "plan-review" | "approval" | "other", "summary": "选哪种调音方案？" }
+{ "kind": "question" | "plan-review" | "approval" | "other", "summary": "示例问题" }
 ```
 
 `lastTurn.kind` 取值来自 Host 侧 `turn/end.reason.kind`：
@@ -104,12 +104,12 @@ Host 插件启动时写 `~/.dsh-status/bridge.json`（权限 0600，原子写入
   "sessions": [
     {
       "id": "session-...",
-      "title": "实现菜单栏图标",
+      "title": "示例会话标题",
       "workspaceId": "35084b06-...",
       "workspaceTitle": "dsh-status",
       "running": false,
       "unread": true,                      // = completionUnread
-      "pending": { "kind": "question", "summary": "选哪种调音方案？" },  // 或 null
+      "pending": { "kind": "question", "summary": "示例问题" },  // 或 null
       "updatedAt": 1762324800000
     }
   ]
