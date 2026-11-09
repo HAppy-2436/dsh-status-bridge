@@ -28,6 +28,8 @@ The plugin has two halves:
    script places it in `~/Applications`).
 2. In DSH: sidebar **Plugins** → **Add plugin** → **Install a third-party plugin**
    → enter the package name `dsh-status-bridge` → **Install** → **Enable now**.
+   If the npm package is not available from your registry yet, paste the Git URL
+   `github:HAppy-2436/dsh-status-bridge` in the same field instead.
 3. The plugin writes `~/.dsh-status/bridge.json` and tries to launch the app; the
    whale / segmented-ring icon should appear in the menu bar.
 4. Clicking a session row in the app panel jumps to that session in DSH.
