@@ -1,0 +1,6 @@
+# DSH Status 桥：插入一行 Host 插件 + 一行 Client 半（dsh.client 自动挂到同一行）。
+# 安装后可在 profile 的用户 patch 里覆盖 config（例如 appPath）。
+- insert:
+    - id: dsh-status
+      name: 'dsh-status-bridge'
+      config: {}

@@ -9,9 +9,21 @@
 ## 常用命令
 
 ```bash
-# 安装
-# 运行
-# 测试
+# 语法检查
+node --check index.js client.js lib/aggregate.js
+# 测试（7 个）
+node --test test/*.test.mjs
+# npm 包内容检查
+pnpm pack
+# 开发用 Host 桥 harness（假 ctx，不启动 DSH）
+DSH_STATUS_DIR=/tmp/dsh-status-dev node test/dev-host.mjs
+```
+
+Node/pnpm 用 DSH runtime：
+
+```bash
+export PATH="$HOME/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin:$PATH"
+node ~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/pnpm/bin/pnpm.cjs pack
 ```
 
 ## 约定

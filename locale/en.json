@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DSH Status Bridge",
+    "description": "Exposes DSH session status to the macOS menu bar app and forwards jump-to-session commands."
+  }
+}
