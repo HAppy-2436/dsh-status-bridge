@@ -36,9 +36,22 @@ jobs:
         run: npm run check
       - name: Unit and integration tests
         run: npm test
+      # 已发布过的版本直接跳过（例如用 GitHub Release 创建 tag 时），保证 workflow 可重跑。
+      - name: Check whether this version is already on npm
+        id: npm-version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if npm view "dsh-status-bridge@$version" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "dsh-status-bridge@$version already exists on npm; skipping publish."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # 走 npm Trusted Publishing（OIDC）：不需要 NPM_TOKEN / OTP。
       # 前提：npmjs.com → 包 dsh-status-bridge 的 Settings → Trusted Publisher 已配置：
       #   Provider=GitHub Actions, Owner=HAppy-2436, Repository=dsh-status-bridge,
       #   Workflow filename=publish.yml, 并勾选允许 npm publish（直接发布）。
       - name: Publish to npm (trusted publishing)
+        if: steps.npm-version.outputs.published != 'true'
         run: npm publish --access public --provenance
