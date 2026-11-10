@@ -38,7 +38,7 @@ jobs:
         run: npm test
       # 已发布过的版本直接跳过（例如用 GitHub Release 创建 tag 时），保证 workflow 可重跑。
       - name: Check whether this version is already on npm
-        id: npm-version
+        id: npm_version
         run: |
           version="${GITHUB_REF_NAME#v}"
           if npm view "dsh-status-bridge@$version" version >/dev/null 2>&1; then
@@ -53,5 +53,5 @@ jobs:
       #   Provider=GitHub Actions, Owner=HAppy-2436, Repository=dsh-status-bridge,
       #   Workflow filename=publish.yml, 并勾选允许 npm publish（直接发布）。
       - name: Publish to npm (trusted publishing)
-        if: steps.npm-version.outputs.published != 'true'
+        if: steps.npm_version.outputs.published != 'true'
         run: npm publish --access public --provenance
