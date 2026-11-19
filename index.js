@@ -37,6 +37,8 @@ export const inject = ['webServer', 'connection']
 
 const PREFIX = '/dsh-status'
 const CLIENT_POLL_TIMEOUT_MS = 25_000
+/** turn/end 之后的这段时间内，客户端可能还有在途的旧快照（running=true），不能据此清临时行。 */
+const SETTLE_MS = 3_000
 const HEARTBEAT_MS = 5_000
 
 export function apply(ctx, config = {}) {
@@ -283,14 +285,20 @@ export function apply(ctx, config = {}) {
         if (!normalized) return respondJson(res, 400, { error: 'bad-snapshot' })
         snapshot = normalized
         focusedSessions = new Map((normalized.focused ?? []).map((entry) => [entry.id, entry]))
-        // 该会话又开始跑了 / 进入待回答 / 客户端自己报了未读 → 临时行让位给真实状态。
-        // 只认 turn/end 之后构建的快照，避免在途的旧快照（running=true）把刚补的行删掉。
+        // 临时行何时让位给真实状态：
+        //   · 会话真的重新开跑 / 进入待回答（turn/end 之后 3s 之外的快照才可信，在途旧快照不算）；
+        //   · 客户端报了未读、且该会话已经不在焦点里（真实 completed 行接管）。
+        // 仍在焦点里的 unread 只是瞬时状态（DSH 主视图会立刻清掉），不能据此删临时行。
         const sentAt = typeof normalized.sentAt === 'number' ? normalized.sentAt : Date.now()
+        const focusedNow = new Set((normalized.focused ?? []).map((entry) => entry.id))
         for (const entry of normalized.sessions) {
-          if (!entry.running && !entry.pending && !entry.unread) continue
           const done = focusedCompletions.get(entry.id)
-          if (done && sentAt <= done.at) continue
-          focusedCompletions.delete(entry.id)
+          if (!done) continue
+          if (entry.running || entry.pending) {
+            if (sentAt > done.at + SETTLE_MS) focusedCompletions.delete(entry.id)
+          } else if (entry.unread && !focusedNow.has(entry.id)) {
+            if (sentAt > done.at) focusedCompletions.delete(entry.id)
+          }
         }
         lastPushAt = Date.now()
         broadcastState()

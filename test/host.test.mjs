@@ -111,7 +111,7 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(bridge.port, fake.server.address().port)
     assert.match(bridge.origin, /^http:\/\/127\.0\.0\.1:\d+$/)
     assert.equal(bridge.token.length, 64)
-    assert.equal(bridge.pluginVersion, '0.1.3')
+    assert.equal(bridge.pluginVersion, '0.1.4')
     assert.equal(bridge.appPath, fakeApp)
     assert.equal((await stat(stateDir)).mode & 0o777, 0o700, 'bridge 目录应为 0700')
     assert.equal((await stat(path.join(stateDir, 'bridge.json'))).mode & 0o777, 0o600, 'bridge.json 应为 0600')
@@ -293,6 +293,51 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
       () => assert.fail('bridge.json 应已删除'),
       () => {}
     )
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('Host 桥：临时「已完成」行的竞态与清理', async () => {
+  const { root, fake, base, auth } = await setup()
+  const post = (body) => jsonRequest(`${base}/dsh-status/client/state`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const getState = async () => (await jsonRequest(`${base}/dsh-status/state`, { headers: auth })).body
+  const row = { id: 's-focus', title: '焦点', workspaceId: 'w', workspaceTitle: 'ws', running: true, unread: false, pending: null, updatedAt: 1 }
+  const focused = [{ id: 's-focus', title: '焦点', workspaceId: 'w', workspaceTitle: 'ws' }]
+  try {
+    await post({ version: 1, sentAt: Date.now(), sessions: [row], focused })
+    fake.ctx.emit('session/event', { id: 's-focus' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+
+    // 在途旧快照（turn/end 之后几十毫秒，但仍写着 running）不能删掉刚补的临时行
+    await post({ version: 1, sentAt: Date.now() + 100, sessions: [row], focused })
+    // 客户端按预期丢掉该会话 → 出现 transient 已完成行
+    await post({ version: 1, sentAt: Date.now() + 200, sessions: [], focused })
+    let state = await getState()
+    const transientRow = state.sessions.find((session) => session.id === 's-focus')
+    assert.equal(transientRow?.transient, true)
+    assert.equal(transientRow?.status, 'completed')
+    assert.deepEqual(state.counts, { waiting: 0, running: 0, completed: 1, stopped: 0, attention: 1 })
+
+    // 仍在焦点里报 unread（DSH 主视图会立刻清掉的瞬时状态）→ 不能因此删掉临时行
+    await post({ version: 1, sentAt: Date.now() + 300, sessions: [{ ...row, running: false, unread: true }], focused })
+    state = await getState()
+    assert.equal(state.sessions.find((session) => session.id === 's-focus')?.status, 'completed')
+    // 未读随后被 DSH 清掉（会话再次不可见）→ 临时行仍在
+    await post({ version: 1, sentAt: Date.now() + 400, sessions: [], focused })
+    state = await getState()
+    assert.equal(state.sessions.find((session) => session.id === 's-focus')?.transient, true)
+
+    // 3s 之后真的重新开跑 → 临时行让位；再次丢掉会话也不该再冒出来
+    await post({ version: 1, sentAt: Date.now() + 5_000, sessions: [row], focused })
+    await post({ version: 1, sentAt: Date.now() + 5_200, sessions: [], focused })
+    state = await getState()
+    assert.equal(state.sessions.some((session) => session.id === 's-focus'), false)
+    assert.deepEqual(state.counts, { waiting: 0, running: 0, completed: 0, stopped: 0, attention: 0 })
+  } finally {
+    await fake.dispose()
     await rm(root, { recursive: true, force: true })
   }
 })
