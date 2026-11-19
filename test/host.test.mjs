@@ -111,7 +111,7 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(bridge.port, fake.server.address().port)
     assert.match(bridge.origin, /^http:\/\/127\.0\.0\.1:\d+$/)
     assert.equal(bridge.token.length, 64)
-    assert.equal(bridge.pluginVersion, '0.1.1')
+    assert.equal(bridge.pluginVersion, '0.1.2')
     assert.equal(bridge.appPath, fakeApp)
     assert.equal((await stat(stateDir)).mode & 0o777, 0o700, 'bridge 目录应为 0700')
     assert.equal((await stat(path.join(stateDir, 'bridge.json'))).mode & 0o777, 0o600, 'bridge.json 应为 0600')
@@ -166,7 +166,8 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(stoppedSession.status, 'stopped')
     assert.deepEqual(stoppedState.body.counts, { waiting: 1, running: 1, completed: 0, stopped: 1, attention: 2 })
 
-    // 焦点会话跑完：DSH 不置 completionUnread，Host 按 turn/end 补一条 notice（不产生状态行、不计入 counts）
+    // 焦点会话跑完：DSH 不置 completionUnread，Host 按 turn/end 补一条 notice；
+    // 客户端随后会把这行丢掉，Host 再补一条 transient 的「已完成」行（图标/面板用）
     fake.ctx.emit('session/event', { id: 's-running' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
     const focusedState = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
     assert.equal(focusedState.body.notices.length, 1)
@@ -174,12 +175,63 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(focusedState.body.notices[0].kind, 'completed')
     assert.equal(focusedState.body.notices[0].title, '跑测试')
     assert.equal(focusedState.body.notices[0].workspaceTitle, 'example-app')
-    assert.deepEqual(focusedState.body.counts, { waiting: 1, running: 1, completed: 0, stopped: 1, attention: 2 })
+    // 快照里还写着 running → 仍按运行中显示，不重复加临时行
+    assert.equal(focusedState.body.sessions.find((session) => session.id === 's-running').status, 'running')
+    assert.equal(focusedState.body.sessions.find((session) => session.id === 's-running').transient, undefined)
+
+    // 客户端丢掉该行（已读、非空闲）→ 出现 transient 已完成行，计入 counts
+    const dropped = {
+      version: 1,
+      sentAt: Date.now(),
+      sessions: snapshot.sessions.filter((entry) => entry.id !== 's-running'),
+      focused: snapshot.focused,
+    }
+    await jsonRequest(`${base}/dsh-status/client/state`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(dropped),
+    })
+    const transientState = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    const transientRow = transientState.body.sessions.find((session) => session.id === 's-running')
+    assert.equal(transientRow.status, 'completed')
+    assert.equal(transientRow.transient, true)
+    assert.equal(transientRow.title, '跑测试')
+    assert.deepEqual(transientState.body.counts, { waiting: 1, running: 0, completed: 1, stopped: 1, attention: 3 })
+
+    // App 点「忽略」→ 临时行消失
+    const dismiss = await jsonRequest(`${base}/dsh-status/command`, {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'dismiss', sessionId: 's-running' }),
+    })
+    assert.equal(dismiss.status, 200)
+    const dismissed = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(dismissed.body.sessions.some((session) => session.id === 's-running'), false)
+    assert.deepEqual(dismissed.body.counts, { waiting: 1, running: 0, completed: 0, stopped: 1, attention: 2 })
+
+    // 会话重新开跑（新快照，sentAt 晚于 turn/end）→ 临时行同样消失
+    fake.ctx.emit('session/event', { id: 's-running' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+    await jsonRequest(`${base}/dsh-status/client/state`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(dropped),
+    })
+    const again = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(again.body.sessions.find((session) => session.id === 's-running').transient, true)
+    await jsonRequest(`${base}/dsh-status/client/state`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...snapshot, sentAt: Date.now() }),
+    })
+    const restarted = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(restarted.body.sessions.find((session) => session.id === 's-running').status, 'running')
+    assert.equal(restarted.body.sessions.find((session) => session.id === 's-running').transient, undefined)
 
     // 非焦点会话不补 notice（它走 completionUnread → completed 行）
+    const beforeUnread = (await jsonRequest(`${base}/dsh-status/state`, { headers: auth })).body.notices.length
     fake.ctx.emit('session/event', { id: 's-unread' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
     const noExtra = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
-    assert.equal(noExtra.body.notices.length, 1)
+    assert.equal(noExtra.body.notices.length, beforeUnread)
     assert.equal(noExtra.body.sessions.find((session) => session.id === 's-unread').status, 'completed')
 
     // SSE 首帧

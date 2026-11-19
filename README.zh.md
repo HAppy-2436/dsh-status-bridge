@@ -89,7 +89,10 @@ DSH 的 `completionUnread` 只在「跑完时不在主视图」才置位，所�
 
 - Client 半在每次快照里带上焦点会话（`focused`，取自 `retainedBy.mainView`）；
 - Host 收到这些会话的 `turn/end` 时生成 `SessionNotice`（`kind` 由原因映射），保留 120s / 最多 20 条；
-- App 首帧只登记、之后按 `id` 去重，照常弹横幅与提示音；**不产生面板行、不计入 counts / 角标**。
+- App 首帧只登记、之后按 `id` 去重，照常弹横幅与提示音；
+- 同时补一条 `transient` 的「已完成」行：图标走「运行中 → 已完成」、角标 +1；
+  App 行尾的 × 会 `POST /command {type:"dismiss"}` 让 Host 删掉它（角标 -1），
+  该会话重新运行/待回答或 Client 报了未读时也会自动删。临时行只在 Host 内存里。
 
 需要 App 侧 `dsh-status` **≥ 0.4.3** 才会显示；旧 App 忽略该字段，行为不变。
 

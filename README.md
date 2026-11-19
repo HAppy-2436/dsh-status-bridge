@@ -102,8 +102,11 @@ separately as `notices`:
   `retainedBy.mainView`);
 - the host turns their `turn/end` into a `SessionNotice` (kind mapped from the reason) and keeps the
   last 120 s / at most 20 entries;
-- the app registers the first frame, then de-duplicates by `id` and shows the usual banner and sound —
-  **no panel row, no counts / badge change**.
+- the app registers the first frame, then de-duplicates by `id` and shows the usual banner and sound;
+- the host also adds a `transient` "completed" row so the icon goes running → completed (badge +1);
+  the × in the app's row posts `{type:"dismiss"}` and the host drops it (badge −1), as does the
+  session running/waiting again or the client reporting it unread. Transient rows live in host
+  memory only.
 
 Requires `dsh-status` **>= 0.4.3**; older apps ignore the field and behave as before.
 

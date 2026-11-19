@@ -108,9 +108,15 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
   "pending": null,                         // waiting 时非空
   "lastTurn": { "kind": "aborted", "at": 1762324799000 },
   "since": 1762324799000,                  // 进入当前状态的时刻
-  "updatedAt": 1762324800000
+  "updatedAt": 1762324800000,
+  "transient": true                        // 可选：焦点会话跑完的临时「已完成」行
 }
 ```
+
+`transient`：焦点会话跑完时 DSH 视为已读，不会产生 completed 行；Host 补一条临时行，
+让 App 的图标/面板走「运行中 → 已完成」而不是直接跳空闲。App 可以
+`POST /command {type:"dismiss", sessionId}` 让 Host 删除它；该会话重新运行、进入待回答，
+或 Client 自己上报未读时，Host 也会自动删除。临时行只存在于 Host 内存：DSH 重启或桥重载后消失。
 
 `pending`：
 
@@ -165,7 +171,8 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
 `since`：Host 缓存每个 session 上一次的 status，变化时记为当前时间（Host 重启后以首次收到的时间为准）。
 
 **焦点会话例外**：`completionUnread` 只在「跑完时不在主视图」才置位，正在看的会话跑完推导为 5
-（丢弃）。Host 用 Client 快照里的 `focused` 补一条 `notices`——收到该会话 `turn/end` 时生成。
+（丢弃）。Host 用 Client 快照里的 `focused` 补一条 `notices`（通知）和一条 `transient` 行
+（图标/面板）——都在收到该会话 `turn/end` 时生成。
 
 ## 3. HTTP 接口
 
@@ -177,7 +184,7 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
 | --- | --- | --- |
 | `GET` | `/dsh-status/state` | 返回当前 `BridgeState`（无状态时也返回结构，sessions 为空、client.connected=false） |
 | `GET` | `/dsh-status/stream` | SSE 推送：连接后立即发一条 `event: state`，之后每次状态变化发一条；每 5s 发 `: ping` 注释保活 |
-| `POST` | `/dsh-status/command` | 请求体 `{ "type": "openSession", "sessionId": "session-..." }`；返回 `{ "ok": true, "requestId": "..." }`；无法入队返回 503/400 |
+| `POST` | `/dsh-status/command` | 请求体 `{ "type": "openSession", "sessionId": "session-..." }`；返回 `{ "ok": true, "requestId": "..." }`；无法入队返回 503/400。`{ "type": "dismiss", "sessionId": "..." }` 删除临时「已完成」行，返回 `{ "ok": true }` |
 | `GET` | `/dsh-status/health` | 无需鉴权，返回 `{ "ok": true, "version": 1 }`，供 App 判断端口存活 |
 
 SSE 示例：

@@ -193,3 +193,40 @@ test('normalizeClientSnapshot：focused 焦点会话列表', () => {
   ])
   assert.deepEqual(normalizeClientSnapshot({}).focused, [])
 })
+
+test('buildBridgeState：焦点会话的临时「已完成」行', () => {
+  const snapshot = {
+    version: 1,
+    sessions: [
+      { id: 's1', title: '还在跑', running: true, unread: false, pending: null, updatedAt: 1 },
+    ],
+  }
+  const transientSessions = [
+    { id: 's1', kind: 'completed', at: 900, title: '还在跑' },   // 快照里还有 → 不重复加行
+    { id: 's2', kind: 'stopped', at: 950, title: '停', workspaceId: 'w', workspaceTitle: 'example-app' },
+  ]
+  const lastTurn = new Map([['s2', { kind: 'aborted', at: 950 }]])
+  const state = buildBridgeState({ snapshot, transientSessions, lastTurn, now: 1_000 })
+
+  assert.equal(state.sessions.length, 2)
+  const s2 = state.sessions.find((session) => session.id === 's2')
+  assert.equal(s2.status, 'stopped')
+  assert.equal(s2.transient, true)
+  assert.equal(s2.title, '停')
+  assert.equal(s2.workspaceTitle, 'example-app')
+  assert.equal(s2.since, 950)
+  assert.deepEqual(state.counts, { waiting: 0, running: 1, completed: 0, stopped: 1, attention: 1 })
+
+  // 真实行归一化后没有 transient 标记
+  assert.equal(state.sessions.find((session) => session.id === 's1').transient, undefined)
+
+  // completed 临时行
+  const completed = buildBridgeState({
+    snapshot: { version: 1, sessions: [] },
+    transientSessions: [{ id: 's3', kind: 'completed', at: 1_000 }],
+    now: 1_000,
+  })
+  assert.equal(completed.sessions[0].status, 'completed')
+  assert.equal(completed.sessions[0].transient, true)
+  assert.deepEqual(completed.counts, { waiting: 0, running: 0, completed: 1, stopped: 0, attention: 1 })
+})

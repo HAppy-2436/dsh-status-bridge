@@ -8,6 +8,7 @@ import {
   createNotice,
   emptyBridgeState,
   normalizeClientSnapshot,
+  noticeStatusFor,
   pruneNotices,
 } from './lib/aggregate.js'
 
@@ -50,6 +51,7 @@ export function apply(ctx, config = {}) {
   const sinceCache = new Map() // sessionId -> { status, since }
   let focusedSessions = new Map() // sessionId -> { title, workspaceId, workspaceTitle }（DSH 主视图）
   let notices = [] // 焦点会话跑完的一次性通知，短时间内保留给 App 去重
+  const focusedCompletions = new Map() // sessionId -> { kind, at, title, workspaceId, workspaceTitle }
   const sseClients = new Set()
   const commandQueue = []
   const commandWaiters = new Set()
@@ -114,6 +116,10 @@ export function apply(ctx, config = {}) {
     })
   }
 
+  function transientSessions() {
+    return [...focusedCompletions.entries()].map(([id, entry]) => ({ id, ...entry }))
+  }
+
   function currentState() {
     const enriched = snapshot ? { ...snapshot, sessions: withHostTitles(snapshot.sessions) } : null
     return buildBridgeState({
@@ -121,6 +127,7 @@ export function apply(ctx, config = {}) {
       lastTurn,
       sinceCache,
       notices,
+      transientSessions: transientSessions(),
       dsh: { pid: process.pid },
       connected: snapshot != null,
       lastPushAt,
@@ -149,6 +156,13 @@ export function apply(ctx, config = {}) {
     // 不产生状态行、不计入 counts / 角标。见 docs/protocol.md §2「notices」。
     const focus = focusedSessions.get(session.id)
     if (focus) {
+      focusedCompletions.set(session.id, {
+        kind: noticeStatusFor(kind),
+        at: Date.now(),
+        title: focus.title,
+        workspaceId: focus.workspaceId,
+        workspaceTitle: focus.workspaceTitle,
+      })
       notices = pruneNotices([
         createNotice({
           sessionId: session.id,
@@ -235,9 +249,15 @@ export function apply(ctx, config = {}) {
       }
       if (method === 'POST' && endpoint === '/command') {
         const body = await readJson(req)
-        if (!body || body.type !== 'openSession' || typeof body.sessionId !== 'string') {
+        if (!body || typeof body.sessionId !== 'string') {
           return respondJson(res, 400, { error: 'bad-command' })
         }
+        // App 点「忽略」：删掉焦点会话的临时「已完成」行（不打扰 Client 半）
+        if (body.type === 'dismiss') {
+          if (focusedCompletions.delete(body.sessionId)) broadcastState()
+          return respondJson(res, 200, { ok: true })
+        }
+        if (body.type !== 'openSession') return respondJson(res, 400, { error: 'bad-command' })
         const requestId = enqueueCommand({ type: 'openSession', sessionId: body.sessionId })
         return respondJson(res, 200, { ok: true, requestId })
       }
@@ -253,6 +273,15 @@ export function apply(ctx, config = {}) {
         if (!normalized) return respondJson(res, 400, { error: 'bad-snapshot' })
         snapshot = normalized
         focusedSessions = new Map((normalized.focused ?? []).map((entry) => [entry.id, entry]))
+        // 该会话又开始跑了 / 进入待回答 / 客户端自己报了未读 → 临时行让位给真实状态。
+        // 只认 turn/end 之后构建的快照，避免在途的旧快照（running=true）把刚补的行删掉。
+        const sentAt = typeof normalized.sentAt === 'number' ? normalized.sentAt : Date.now()
+        for (const entry of normalized.sessions) {
+          if (!entry.running && !entry.pending && !entry.unread) continue
+          const done = focusedCompletions.get(entry.id)
+          if (done && sentAt <= done.at) continue
+          focusedCompletions.delete(entry.id)
+        }
         lastPushAt = Date.now()
         broadcastState()
         return respondJson(res, 204, null)
