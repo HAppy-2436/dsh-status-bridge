@@ -111,7 +111,7 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(bridge.port, fake.server.address().port)
     assert.match(bridge.origin, /^http:\/\/127\.0\.0\.1:\d+$/)
     assert.equal(bridge.token.length, 64)
-    assert.equal(bridge.pluginVersion, '0.1.2')
+    assert.equal(bridge.pluginVersion, '0.1.3')
     assert.equal(bridge.appPath, fakeApp)
     assert.equal((await stat(stateDir)).mode & 0o777, 0o700, 'bridge 目录应为 0700')
     assert.equal((await stat(path.join(stateDir, 'bridge.json'))).mode & 0o777, 0o600, 'bridge.json 应为 0600')
@@ -208,6 +208,24 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     const dismissed = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
     assert.equal(dismissed.body.sessions.some((session) => session.id === 's-running'), false)
     assert.deepEqual(dismissed.body.counts, { waiting: 1, running: 0, completed: 0, stopped: 1, attention: 2 })
+
+    // 「全部忽略」：不带 sessionId 的 dismiss 清掉所有临时行
+    fake.ctx.emit('session/event', { id: 's-running' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+    await jsonRequest(`${base}/dsh-status/client/state`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(dropped),
+    })
+    assert.equal((await jsonRequest(`${base}/dsh-status/state`, { headers: auth }))
+      .body.sessions.find((session) => session.id === 's-running').transient, true)
+    const dismissAll = await jsonRequest(`${base}/dsh-status/command`, {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'dismiss' }),
+    })
+    assert.equal(dismissAll.status, 200)
+    assert.equal((await jsonRequest(`${base}/dsh-status/state`, { headers: auth }))
+      .body.sessions.some((session) => session.id === 's-running'), false)
 
     // 会话重新开跑（新快照，sentAt 晚于 turn/end）→ 临时行同样消失
     fake.ctx.emit('session/event', { id: 's-running' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })

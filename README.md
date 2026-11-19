@@ -104,7 +104,8 @@ separately as `notices`:
   last 120 s / at most 20 entries;
 - the app registers the first frame, then de-duplicates by `id` and shows the usual banner and sound;
 - the host also adds a `transient` "completed" row so the icon goes running → completed (badge +1);
-  the × in the app's row posts `{type:"dismiss"}` and the host drops it (badge −1), as does the
+  the × in the app's row posts `{type:"dismiss"}` and the host drops it (badge −1); the app's
+  right-click "Dismiss All" posts the same command without `sessionId` to clear every row, as does the
   session running/waiting again or the client reporting it unread. Transient rows live in host
   memory only.
 

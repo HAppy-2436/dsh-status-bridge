@@ -184,7 +184,7 @@ App 据此弹一次通知；**notice 不产生面板行、不计入 counts / 角
 | --- | --- | --- |
 | `GET` | `/dsh-status/state` | 返回当前 `BridgeState`（无状态时也返回结构，sessions 为空、client.connected=false） |
 | `GET` | `/dsh-status/stream` | SSE 推送：连接后立即发一条 `event: state`，之后每次状态变化发一条；每 5s 发 `: ping` 注释保活 |
-| `POST` | `/dsh-status/command` | 请求体 `{ "type": "openSession", "sessionId": "session-..." }`；返回 `{ "ok": true, "requestId": "..." }`；无法入队返回 503/400。`{ "type": "dismiss", "sessionId": "..." }` 删除临时「已完成」行，返回 `{ "ok": true }` |
+| `POST` | `/dsh-status/command` | 请求体 `{ "type": "openSession", "sessionId": "session-..." }`；返回 `{ "ok": true, "requestId": "..." }`；无法入队返回 503/400。`{ "type": "dismiss", "sessionId": "..." }` 删除临时「已完成」行，返回 `{ "ok": true }`；不带 `sessionId` 表示全部忽略（App 右键菜单「全部忽略」） |
 | `GET` | `/dsh-status/health` | 无需鉴权，返回 `{ "ok": true, "version": 1 }`，供 App 判断端口存活 |
 
 SSE 示例：

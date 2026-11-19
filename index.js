@@ -249,15 +249,25 @@ export function apply(ctx, config = {}) {
       }
       if (method === 'POST' && endpoint === '/command') {
         const body = await readJson(req)
-        if (!body || typeof body.sessionId !== 'string') {
+        if (!body || typeof body.type !== 'string') {
           return respondJson(res, 400, { error: 'bad-command' })
         }
-        // App 点「忽略」：删掉焦点会话的临时「已完成」行（不打扰 Client 半）
+        // App 点「忽略」：删掉焦点会话的临时「已完成」行（不打扰 Client 半）。
+        // 带 sessionId 删一条；不带则「全部忽略」。
         if (body.type === 'dismiss') {
-          if (focusedCompletions.delete(body.sessionId)) broadcastState()
+          let changed = false
+          if (typeof body.sessionId === 'string' && body.sessionId !== '') {
+            changed = focusedCompletions.delete(body.sessionId)
+          } else if (focusedCompletions.size > 0) {
+            focusedCompletions.clear()
+            changed = true
+          }
+          if (changed) broadcastState()
           return respondJson(res, 200, { ok: true })
         }
-        if (body.type !== 'openSession') return respondJson(res, 400, { error: 'bad-command' })
+        if (body.type !== 'openSession' || typeof body.sessionId !== 'string') {
+          return respondJson(res, 400, { error: 'bad-command' })
+        }
         const requestId = enqueueCommand({ type: 'openSession', sessionId: body.sessionId })
         return respondJson(res, 200, { ok: true, requestId })
       }
