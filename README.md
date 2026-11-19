@@ -92,6 +92,21 @@ empty):
   `sessionProjections.stateOf(session, 'title')` for running sessions;
 - the app shows "Untitled session" when nothing is available.
 
+## Focus-session completion alerts
+
+DSH sets `completionUnread` only when a turn ends outside the main view, so a session that finishes
+while you are watching it never produces a "completed"/"stopped" row. The bridge reports it
+separately as `notices`:
+
+- the client half includes focused sessions in every snapshot (`focused`, derived from
+  `retainedBy.mainView`);
+- the host turns their `turn/end` into a `SessionNotice` (kind mapped from the reason) and keeps the
+  last 120 s / at most 20 entries;
+- the app registers the first frame, then de-duplicates by `id` and shows the usual banner and sound —
+  **no panel row, no counts / badge change**.
+
+Requires `dsh-status` **>= 0.4.3**; older apps ignore the field and behave as before.
+
 ## Known limitations
 
 - `completionUnread` on the client is renderer-memory state: unread counts reset
@@ -107,7 +122,7 @@ empty):
 export PATH="$HOME/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin:$PATH"
 
 npm run check          # node --check index.js client.js lib/aggregate.js
-npm test               # node --test test/*.test.mjs (7 tests)
+npm test               # node --test test/*.test.mjs (11 tests)
 npm pack --dry-run     # inspect the tarball contents
 ```
 

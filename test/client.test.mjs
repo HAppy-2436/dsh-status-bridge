@@ -45,7 +45,7 @@ test('Client 半：聚合快照 + 过滤 + 长轮询跳转', async () => {
     ])
     const sessionItems = [
       { sessionId: 'session-1', title: '示例问题', cwd: '/Users/x/example-app', updatedAt: 10 },
-      { sessionId: 'session-2', title: '', cwd: '/Users/x/dsh-status', updatedAt: 20 },
+      { sessionId: 'session-2', title: '', cwd: '/Users/x/dsh-status', updatedAt: 20, retainedBy: { mainView: 1 } },
       { sessionId: 'session-3', title: '写协议', cwd: '/Users/x/dsh-status', updatedAt: 30 },
       { sessionId: 'session-4', title: '空闲会话', cwd: '/Users/x/example-lab', updatedAt: 40 },
       { sessionId: 'session-5', title: '空白会话', cwd: '/Users/x/example-lab', updatedAt: 50, blank: true },
@@ -93,6 +93,11 @@ test('Client 半：聚合快照 + 过滤 + 长轮询跳转', async () => {
     assert.equal(byId.get('session-2').workspaceTitle, 'dsh-status')
 
     assert.equal(byId.get('session-3').unread, true)
+
+    // 焦点会话（DSH 主视图）单独上报：completionUnread 不会置位，Host 靠它补通知
+    assert.deepEqual(snapshot.focused, [
+      { id: 'session-2', title: '', workspaceId: 'w-dsh', workspaceTitle: 'dsh-status' },
+    ])
 
     // 缺标题时主动拉取投影
     assert.ok(titleRefreshes.includes('session-2'), '缺标题的会话应请求 refreshProjections')

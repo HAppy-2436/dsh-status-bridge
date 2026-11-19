@@ -111,7 +111,7 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(bridge.port, fake.server.address().port)
     assert.match(bridge.origin, /^http:\/\/127\.0\.0\.1:\d+$/)
     assert.equal(bridge.token.length, 64)
-    assert.equal(bridge.pluginVersion, '0.1.0')
+    assert.equal(bridge.pluginVersion, '0.1.1')
     assert.equal(bridge.appPath, fakeApp)
     assert.equal((await stat(stateDir)).mode & 0o777, 0o700, 'bridge 目录应为 0700')
     assert.equal((await stat(path.join(stateDir, 'bridge.json'))).mode & 0o777, 0o600, 'bridge.json 应为 0600')
@@ -136,6 +136,9 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
         { id: 's-running', title: '跑测试', workspaceId: 'w1', workspaceTitle: 'example-app', running: true, unread: false, pending: null, updatedAt: 2 },
         { id: 's-unread', title: '写协议', workspaceId: 'w2', workspaceTitle: 'example-app', running: false, unread: true, pending: null, updatedAt: 3 },
         { id: 's-idle', title: '空闲', running: false, unread: false, pending: null, updatedAt: 4 },
+      ],
+      focused: [
+        { id: 's-running', title: '跑测试', workspaceId: 'w1', workspaceTitle: 'example-app' },
       ],
     }
     const push = await jsonRequest(`${base}/dsh-status/client/state`, {
@@ -162,6 +165,22 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     const stoppedSession = stoppedState.body.sessions.find((session) => session.id === 's-unread')
     assert.equal(stoppedSession.status, 'stopped')
     assert.deepEqual(stoppedState.body.counts, { waiting: 1, running: 1, completed: 0, stopped: 1, attention: 2 })
+
+    // 焦点会话跑完：DSH 不置 completionUnread，Host 按 turn/end 补一条 notice（不产生状态行、不计入 counts）
+    fake.ctx.emit('session/event', { id: 's-running' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+    const focusedState = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(focusedState.body.notices.length, 1)
+    assert.equal(focusedState.body.notices[0].sessionId, 's-running')
+    assert.equal(focusedState.body.notices[0].kind, 'completed')
+    assert.equal(focusedState.body.notices[0].title, '跑测试')
+    assert.equal(focusedState.body.notices[0].workspaceTitle, 'example-app')
+    assert.deepEqual(focusedState.body.counts, { waiting: 1, running: 1, completed: 0, stopped: 1, attention: 2 })
+
+    // 非焦点会话不补 notice（它走 completionUnread → completed 行）
+    fake.ctx.emit('session/event', { id: 's-unread' }, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+    const noExtra = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(noExtra.body.notices.length, 1)
+    assert.equal(noExtra.body.sessions.find((session) => session.id === 's-unread').status, 'completed')
 
     // SSE 首帧
     const controller = new AbortController()

@@ -174,6 +174,26 @@ function buildSnapshot(ctx, requestTitleRefresh = () => {}) {
     if (key) bySession.set(key, item)
   }
 
+  // 焦点会话（DSH 主视图）：跑完时 completionUnread 不会置位，Host 靠这份信息补一次性通知。
+  const focused = []
+  for (const item of items) {
+    if (focused.length >= 8) break
+    const id = typeof item?.sessionId === 'string'
+      ? item.sessionId
+      : (typeof item?.id === 'string' ? item.id : null)
+    if (!id || archived.has(id) || item?.blank === true) continue
+    if ((item?.retainedBy?.mainView ?? 0) <= 0) continue
+    const workspaceId = sessionWorkspace.get(id) ?? null
+    focused.push({
+      id,
+      title: titleOf(item, listSnapshot, id, requestTitleRefresh),
+      workspaceId,
+      workspaceTitle: workspaceId
+        ? workspaceTitles.get(workspaceId) ?? null
+        : folderTitle(item?.cwd),
+    })
+  }
+
   const sessions = []
   const subagents = []
   for (const [sessionId, status] of statusMap ?? []) {
@@ -223,7 +243,7 @@ function buildSnapshot(ctx, requestTitleRefresh = () => {}) {
     })
   }
 
-  return { version: 1, sentAt: now, sessions, subagents }
+  return { version: 1, sentAt: now, sessions, subagents, focused }
 }
 
 function normalizePending(pending) {

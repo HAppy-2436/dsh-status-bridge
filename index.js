@@ -5,8 +5,10 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import {
   buildBridgeState,
+  createNotice,
   emptyBridgeState,
   normalizeClientSnapshot,
+  pruneNotices,
 } from './lib/aggregate.js'
 
 /**
@@ -46,6 +48,8 @@ export function apply(ctx, config = {}) {
   const hostProjections = typeof ctx.get === 'function' ? ctx.get('sessionProjections') : undefined
   const lastTurn = new Map() // sessionId -> { kind, at }
   const sinceCache = new Map() // sessionId -> { status, since }
+  let focusedSessions = new Map() // sessionId -> { title, workspaceId, workspaceTitle }（DSH 主视图）
+  let notices = [] // 焦点会话跑完的一次性通知，短时间内保留给 App 去重
   const sseClients = new Set()
   const commandQueue = []
   const commandWaiters = new Set()
@@ -116,6 +120,7 @@ export function apply(ctx, config = {}) {
       snapshot: enriched,
       lastTurn,
       sinceCache,
+      notices,
       dsh: { pid: process.pid },
       connected: snapshot != null,
       lastPushAt,
@@ -140,6 +145,22 @@ export function apply(ctx, config = {}) {
     if (event.type !== 'turn/end') return
     const kind = event.data?.reason?.kind ?? 'completed'
     lastTurn.set(session.id, { kind, at: Date.now() })
+    // 焦点会话跑完：DSH 不置 completionUnread（用户正看着它），桥按 turn/end 补一条通知，
+    // 不产生状态行、不计入 counts / 角标。见 docs/protocol.md §2「notices」。
+    const focus = focusedSessions.get(session.id)
+    if (focus) {
+      notices = pruneNotices([
+        createNotice({
+          sessionId: session.id,
+          kind,
+          at: Date.now(),
+          title: focus.title,
+          workspaceId: focus.workspaceId,
+          workspaceTitle: focus.workspaceTitle,
+        }),
+        ...notices,
+      ])
+    }
     broadcastState()
   }
 
@@ -231,6 +252,7 @@ export function apply(ctx, config = {}) {
         const normalized = normalizeClientSnapshot(body)
         if (!normalized) return respondJson(res, 400, { error: 'bad-snapshot' })
         snapshot = normalized
+        focusedSessions = new Map((normalized.focused ?? []).map((entry) => [entry.id, entry]))
         lastPushAt = Date.now()
         broadcastState()
         return respondJson(res, 204, null)

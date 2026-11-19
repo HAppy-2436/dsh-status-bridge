@@ -9,7 +9,7 @@ macOS 菜单栏 App，并把 App 里的「跳转到会话」命令回传给 DSH�
 
 | 文件 | 作用 |
 | --- | --- |
-| `index.js` | Host 桥：注册 `/dsh-status` 路由（状态 / SSE / 命令），监听 `turn/end` 区分「已完成」与「已停止」，写 `~/.dsh-status/bridge.json`，可选拉起 App |
+| `index.js` | Host 桥：注册 `/dsh-status` 路由（状态 / SSE / 命令），监听 `turn/end` 区分「已完成」与「已停止」、给焦点会话补 `notices`，写 `~/.dsh-status/bridge.json`，可选拉起 App |
 | `client.js` | Client 半（DSH 渲染进程内，无 UI）：聚合 `uiSession` / `sessions` / `workspaces` 状态推给 Host；长轮询执行 `uiWorkspace.openSession` |
 | `lib/aggregate.js` | 纯函数：状态推导 / 计数 / 快照校验（Host 与测试共用） |
 | `test/` | `node --test` 单元测试 + Host 路由集成测试 + Client 半假 ctx 测试 |
@@ -82,6 +82,17 @@ App 路径按以下顺序探测，把第一个存在的路径写进 `bridge.json
 - Host 桥对**运行中会话**额外用 live Agent 的 `sessionProjections.stateOf(session, 'title')` 兜底；
 - 仍拿不到时 App 显示「未命名会话」。
 
+## 焦点会话的完成提醒
+
+DSH 的 `completionUnread` 只在「跑完时不在主视图」才置位，所以正在看的会话跑完不会有
+「已完成 / 已停止」行。桥为此单独补一条 `notices`：
+
+- Client 半在每次快照里带上焦点会话（`focused`，取自 `retainedBy.mainView`）；
+- Host 收到这些会话的 `turn/end` 时生成 `SessionNotice`（`kind` 由原因映射），保留 120s / 最多 20 条；
+- App 首帧只登记、之后按 `id` 去重，照常弹横幅与提示音；**不产生面板行、不计入 counts / 角标**。
+
+需要 App 侧 `dsh-status` **≥ 0.4.3** 才会显示；旧 App 忽略该字段，行为不变。
+
 ## 已知限制
 
 - Client 侧 `completionUnread` 是渲染进程内存态：DSH 重启后未读归零（与 DSH 自带提醒一致）。
@@ -94,7 +105,7 @@ App 路径按以下顺序探测，把第一个存在的路径写进 `bridge.json
 export PATH="$HOME/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin:$PATH"
 
 npm run check          # node --check index.js client.js lib/aggregate.js
-npm test               # node --test test/*.test.mjs（7 个测试）
+npm test               # node --test test/*.test.mjs（11 个测试）
 npm pack --dry-run     # 检查 npm 包内容
 ```
 
