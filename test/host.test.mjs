@@ -1,11 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
+import { readFileSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const PACKAGE_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
 function createFakeCtx() {
   const routes = new Map()
@@ -111,7 +113,7 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(bridge.port, fake.server.address().port)
     assert.match(bridge.origin, /^http:\/\/127\.0\.0\.1:\d+$/)
     assert.equal(bridge.token.length, 64)
-    assert.equal(bridge.pluginVersion, '0.1.4')
+    assert.equal(bridge.pluginVersion, PACKAGE_VERSION)
     assert.equal(bridge.appPath, fakeApp)
     assert.equal((await stat(stateDir)).mode & 0o777, 0o700, 'bridge 目录应为 0700')
     assert.equal((await stat(path.join(stateDir, 'bridge.json'))).mode & 0o777, 0o600, 'bridge.json 应为 0600')
@@ -159,12 +161,25 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(byId.get('s-unread').status, 'completed')
     assert.equal(byId.has('s-idle'), false)
 
-    // turn/end aborted → unread 变已停止
-    fake.ctx.emit('session/event', { id: 's-unread' }, { type: 'turn/end', data: { reason: { kind: 'aborted' } } })
+    // turn/end error → unread 变已停止，保留行与角标（出错停止照常提醒）
+    fake.ctx.emit('session/event', { id: 's-unread' }, { type: 'turn/end', data: { reason: { kind: 'error', error: { message: 'Connection error.', code: 'TRANSPORT' } } } })
     const stoppedState = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
     const stoppedSession = stoppedState.body.sessions.find((session) => session.id === 's-unread')
     assert.equal(stoppedSession.status, 'stopped')
+    assert.equal(stoppedSession.lastTurn.kind, 'error')
+    assert.equal(stoppedSession.lastTurn.cancel, undefined)
+    assert.equal(typeof stoppedSession.lastTurn.at, 'number')
     assert.deepEqual(stoppedState.body.counts, { waiting: 1, running: 1, completed: 0, stopped: 1, attention: 2 })
+
+    // 用户主动停止 → 连「已停止」行 / 角标都不留
+    fake.ctx.emit('session/event', { id: 's-unread' }, { type: 'turn/end', data: { reason: { kind: 'aborted', reason: { kind: 'user' } } } })
+    const userStoppedUnread = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(userStoppedUnread.body.sessions.some((session) => session.id === 's-unread'), false)
+    assert.equal(userStoppedUnread.body.counts.stopped, 0)
+    // 恢复成出错停止，供后续断言使用
+    fake.ctx.emit('session/event', { id: 's-unread' }, { type: 'turn/end', data: { reason: { kind: 'error', error: { message: 'Connection error.', code: 'TRANSPORT' } } } })
+    assert.equal((await jsonRequest(`${base}/dsh-status/state`, { headers: auth }))
+      .body.sessions.find((session) => session.id === 's-unread').status, 'stopped')
 
     // 焦点会话跑完：DSH 不置 completionUnread，Host 按 turn/end 补一条 notice；
     // 客户端随后会把这行丢掉，Host 再补一条 transient 的「已完成」行（图标/面板用）
@@ -244,6 +259,23 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     const restarted = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
     assert.equal(restarted.body.sessions.find((session) => session.id === 's-running').status, 'running')
     assert.equal(restarted.body.sessions.find((session) => session.id === 's-running').transient, undefined)
+
+    // 焦点会话被用户按停止：不补 notice，也不留临时「已停止」行
+    const noticesBeforeUserStop = (await jsonRequest(`${base}/dsh-status/state`, { headers: auth })).body.notices.length
+    fake.ctx.emit('session/event', { id: 's-running' }, { type: 'turn/end', data: { reason: { kind: 'aborted', reason: { kind: 'user' } } } })
+    const userStoppedState = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(userStoppedState.body.notices.length, noticesBeforeUserStop)
+    assert.equal(userStoppedState.body.notices.some((notice) => notice.sessionId === 's-running' && notice.kind === 'stopped'), false)
+    assert.equal(userStoppedState.body.sessions.find((session) => session.id === 's-running').lastTurn.cancel, 'user')
+    // 客户端随后丢掉该行 → 不应再补 transient 行，counts 只保留出错停止的那一条
+    await jsonRequest(`${base}/dsh-status/client/state`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(dropped),
+    })
+    const afterUserStop = await jsonRequest(`${base}/dsh-status/state`, { headers: auth })
+    assert.equal(afterUserStop.body.sessions.some((session) => session.id === 's-running'), false)
+    assert.deepEqual(afterUserStop.body.counts, { waiting: 1, running: 0, completed: 0, stopped: 1, attention: 2 })
 
     // 非焦点会话不补 notice（它走 completionUnread → completed 行）
     const beforeUnread = (await jsonRequest(`${base}/dsh-status/state`, { headers: auth })).body.notices.length

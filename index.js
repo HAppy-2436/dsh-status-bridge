@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, wri
 import { homedir } from 'node:os'
 import path from 'node:path'
 import {
+  abortCauseOf,
   buildBridgeState,
   createNotice,
   emptyBridgeState,
@@ -152,15 +153,24 @@ export function apply(ctx, config = {}) {
   function onSessionEvent(session, event) {
     if (disposed || !session || !event) return
     if (event.type !== 'turn/end') return
-    const kind = event.data?.reason?.kind ?? 'completed'
-    lastTurn.set(session.id, { kind, at: Date.now() })
+    const reason = event.data?.reason
+    const kind = reason?.kind ?? 'completed'
+    const cancel = abortCauseOf(reason)
+    const userStop = kind === 'aborted' && cancel === 'user'
+    const at = Date.now()
+    lastTurn.set(session.id, { kind, ...(cancel ? { cancel } : {}), at })
     // 焦点会话跑完：DSH 不置 completionUnread（用户正看着它），桥按 turn/end 补一条通知，
     // 不产生状态行、不计入 counts / 角标。见 docs/protocol.md §2「notices」。
+    // 用户自己按停止：通知、临时行、状态行都不留（他按下停止时正看着这个会话），
+    // 由 statusOf 的 cancel=user 分支把可能出现的 unread 行一并丢掉。
     const focus = focusedSessions.get(session.id)
-    if (focus) {
+    if (userStop) {
+      // 用户主动停止：清掉上一轮可能残留的临时「已完成」行，且不生成新 notice / 临时行。
+      focusedCompletions.delete(session.id)
+    } else if (focus) {
       focusedCompletions.set(session.id, {
         kind: noticeStatusFor(kind),
-        at: Date.now(),
+        at,
         title: focus.title,
         workspaceId: focus.workspaceId,
         workspaceTitle: focus.workspaceTitle,
@@ -169,7 +179,8 @@ export function apply(ctx, config = {}) {
         createNotice({
           sessionId: session.id,
           kind,
-          at: Date.now(),
+          cancel,
+          at,
           title: focus.title,
           workspaceId: focus.workspaceId,
           workspaceTitle: focus.workspaceTitle,

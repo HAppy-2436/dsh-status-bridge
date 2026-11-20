@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  abortCauseOf,
   buildBridgeState,
   createNotice,
   emptyBridgeState,
@@ -17,6 +18,8 @@ test('statusOf：优先级与 turn 结果', () => {
   assert.equal(statusOf({ pending: { kind: 'question' }, running: true }, null), 'waiting')
   assert.equal(statusOf({ running: true }, null), 'running')
   assert.equal(statusOf({ unread: true }, { kind: 'aborted' }), 'stopped')
+  assert.equal(statusOf({ unread: true }, { kind: 'aborted', cancel: 'user' }), 'idle')
+  assert.equal(statusOf({ unread: true }, { kind: 'aborted', cancel: 'parent' }), 'stopped')
   assert.equal(statusOf({ unread: true }, { kind: 'error' }), 'stopped')
   assert.equal(statusOf({ unread: true }, { kind: 'blocked' }), 'stopped')
   assert.equal(statusOf({ unread: true }, { kind: 'completed' }), 'completed')
@@ -79,6 +82,24 @@ test('buildBridgeState：合并、排序、计数与 since 稳定', () => {
   assert.equal(state3.sessions.find((session) => session.id === 's2').status, 'completed')
 })
 
+test('buildBridgeState：用户主动停止不进面板 / counts', () => {
+  const snapshot = {
+    version: 1,
+    sessions: [
+      { id: 'user-stop', title: '主动停', running: false, unread: true, pending: null, updatedAt: 1 },
+      { id: 'error-stop', title: '出错停', running: false, unread: true, pending: null, updatedAt: 2 },
+    ],
+  }
+  const lastTurn = new Map([
+    ['user-stop', { kind: 'aborted', cancel: 'user', at: 1 }],
+    ['error-stop', { kind: 'error', at: 2 }],
+  ])
+  const state = buildBridgeState({ snapshot, lastTurn, now: 10 })
+  assert.deepEqual(state.sessions.map((session) => session.id), ['error-stop'])
+  assert.deepEqual(state.sessions[0].lastTurn, { kind: 'error', at: 2 })
+  assert.deepEqual(state.counts, { waiting: 0, running: 0, completed: 0, stopped: 1, attention: 1 })
+})
+
 test('emptyBridgeState：未连接空状态', () => {
   const state = emptyBridgeState({ now: 1, dsh: { pid: 2 } })
   assert.deepEqual(state.counts, { waiting: 0, running: 0, completed: 0, stopped: 0, attention: 0 })
@@ -111,6 +132,19 @@ test('normalizeClientSnapshot：校验、去重、截断、兜底', () => {
   assert.deepEqual(snapshot.sessions[1].pending, { kind: 'question' })
 })
 
+test('abortCauseOf：区分主动停止与其它打断来源', () => {
+  assert.equal(abortCauseOf({ kind: 'aborted', reason: { kind: 'user' } }), 'user')
+  assert.equal(abortCauseOf({ kind: 'aborted', reason: { kind: 'parent' } }), 'parent')
+  assert.equal(abortCauseOf({ kind: 'aborted', reason: { kind: 'hook', reason: 'x' } }), 'hook')
+  assert.equal(abortCauseOf({ kind: 'aborted', reason: { kind: 'disposed' } }), 'disposed')
+  assert.equal(abortCauseOf({ kind: 'aborted', reason: { kind: 'legacy' } }), 'legacy')
+  assert.equal(abortCauseOf({ kind: 'aborted' }), null, '旧记录没有取消来源')
+  assert.equal(abortCauseOf({ kind: 'aborted', reason: { kind: 'future' } }), null)
+  assert.equal(abortCauseOf({ kind: 'error', reason: { kind: 'user' } }), null, 'error 没有 cancel')
+  assert.equal(abortCauseOf({ kind: 'completed' }), null)
+  assert.equal(abortCauseOf(undefined), null)
+})
+
 test('notices：turn/end 原因映射与一次性通知生成', () => {
   assert.equal(noticeStatusFor('completed'), 'completed')
   assert.equal(noticeStatusFor('max-tokens'), 'completed')
@@ -125,6 +159,11 @@ test('notices：turn/end 原因映射与一次性通知生成', () => {
     title: '跑测试', workspaceId: null, workspaceTitle: null, at: 1_000,
   })
   assert.equal(createNotice({ sessionId: 's2', kind: 'completed', at: 5 }).title, '')
+
+  const userStopped = createNotice({ sessionId: 's3', kind: 'aborted', cancel: 'user', at: 7 })
+  assert.equal(userStopped.kind, 'stopped')
+  assert.equal(userStopped.cancel, 'user')
+  assert.equal(createNotice({ sessionId: 's4', kind: 'error', cancel: 'user', at: 8 }).cancel, undefined)
 })
 
 test('pruneNotices：过期 / 重复 / 排序 / 截断', () => {
@@ -133,14 +172,17 @@ test('pruneNotices：过期 / 重复 / 排序 / 截断', () => {
     { id: 'old', sessionId: 's-old', kind: 'completed', at: now - NOTICE_TTL_MS - 1 },
     { id: 'fresh', sessionId: 's1', kind: 'completed', at: now - 1_000 },
     { id: 'fresh', sessionId: 's1', kind: 'stopped', at: now - 1_000 },
+    { id: 'user-stop', sessionId: 's2', kind: 'stopped', cancel: 'user', at: now - 2_000 },
     { sessionId: 's2', kind: 'weird', at: now - 5_000 },
     { sessionId: '', kind: 'completed', at: now },
     { sessionId: 's3', kind: 'completed', at: 'bad' },
     null,
   ], { now })
-  assert.deepEqual(kept.map((notice) => notice.id), ['fresh', 's2:995000'])
+  assert.deepEqual(kept.map((notice) => notice.id), ['fresh', 'user-stop', 's2:995000'])
   assert.equal(kept[0].kind, 'completed')
-  assert.equal(kept[1].kind, 'completed', '未知 kind 归为 completed')
+  assert.equal(kept[1].cancel, 'user', '主动停止的取消来源被保留')
+  assert.equal(kept[2].kind, 'completed', '未知 kind 归为 completed')
+  assert.equal(kept[2].cancel, undefined)
 
   const many = Array.from({ length: NOTICE_LIMIT + 5 }, (_, index) => ({
     id: `n${index}`, sessionId: `s${index}`, kind: 'completed', at: now - index,

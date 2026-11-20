@@ -102,6 +102,10 @@ separately as `notices`:
   `retainedBy.mainView`);
 - the host turns their `turn/end` into a `SessionNotice` (kind mapped from the reason) and keeps the
   last 120 s / at most 20 entries;
+- **user stop vs error stop**: the abort cause (`turn/end.reason.reason.kind`) is exposed as
+  `lastTurn.cancel`. For `user` the host emits no notice/transient row and drops the unread "stopped"
+  row, so the app stays silent and the panel/badge show nothing; `error`,
+  hook/parent/dispose cancellations still alert;
 - the app registers the first frame, then de-duplicates by `id` and shows the usual banner and sound;
 - the host also adds a `transient` "completed" row so the icon goes running → completed (badge +1);
   the × in the app's row posts `{type:"dismiss"}` and the host drops it (badge −1); the app's
@@ -109,7 +113,9 @@ separately as `notices`:
   session running/waiting again or the client reporting it unread. Transient rows live in host
   memory only.
 
-Requires `dsh-status` **>= 0.4.3**; older apps ignore the field and behave as before.
+Requires `dsh-status` **>= 0.4.3**; older apps ignore `notices` / `cancel` and behave as before.
+Silencing user-initiated stops requires the app at **>= 0.4.4 build 22**; dropping the "stopped"
+row/badge as well requires bridge **>= 0.1.6**.
 
 ## Known limitations
 
@@ -126,7 +132,7 @@ Requires `dsh-status` **>= 0.4.3**; older apps ignore the field and behave as be
 export PATH="$HOME/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin:$PATH"
 
 npm run check          # node --check index.js client.js lib/aggregate.js
-npm test               # node --test test/*.test.mjs (11 tests)
+npm test               # node --test test/*.test.mjs (15 tests)
 npm pack --dry-run     # inspect the tarball contents
 ```
 

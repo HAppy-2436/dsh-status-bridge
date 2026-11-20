@@ -89,13 +89,18 @@ DSH 的 `completionUnread` 只在「跑完时不在主视图」才置位，所�
 
 - Client 半在每次快照里带上焦点会话（`focused`，取自 `retainedBy.mainView`）；
 - Host 收到这些会话的 `turn/end` 时生成 `SessionNotice`（`kind` 由原因映射），保留 120s / 最多 20 条；
+- **区分主动停止与出错停止**：`aborted` 的取消来源（`turn/end.reason.reason.kind`）写进
+  `lastTurn.cancel`。`user` 表示用户自己按了停止：Host 不生成 notice / 临时行，并丢弃该会话的
+  unread 状态行，所以 App 不弹横幅/提示音、面板不出现「已停止」行、角标不增加；
+  `error`、被 hook/parent/dispose 打断等来源仍照常提醒；
 - App 首帧只登记、之后按 `id` 去重，照常弹横幅与提示音；
 - 同时补一条 `transient` 的「已完成」行：图标走「运行中 → 已完成」、角标 +1；
   App 行尾的 × 会 `POST /command {type:"dismiss"}` 让 Host 删掉它（角标 -1），右键菜单「全部忽略」发不带
   `sessionId` 的同一条命令清掉全部，
   该会话重新运行/待回答或 Client 报了未读时也会自动删。临时行只在 Host 内存里。
 
-需要 App 侧 `dsh-status` **≥ 0.4.3** 才会显示；旧 App 忽略该字段，行为不变。
+需要 App 侧 `dsh-status` **≥ 0.4.3** 才会显示；旧 App 忽略 `notices` / `cancel`，行为不变。
+按 `cancel` 静音提醒需要 App **≥ 0.4.4 build 22**；丢弃「已停止」行/角标需要桥 **≥ 0.1.6**。
 
 ## 已知限制
 
@@ -109,7 +114,7 @@ DSH 的 `completionUnread` 只在「跑完时不在主视图」才置位，所�
 export PATH="$HOME/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin:$PATH"
 
 npm run check          # node --check index.js client.js lib/aggregate.js
-npm test               # node --test test/*.test.mjs（11 个测试）
+npm test               # node --test test/*.test.mjs（15 个测试）
 npm pack --dry-run     # 检查 npm 包内容
 ```
 
