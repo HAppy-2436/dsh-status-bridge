@@ -1,6 +1,6 @@
 {
   "name": "dsh-status-bridge",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "description": "DSH plugin that bridges DeepSeek Harness session status to the macOS menu bar app DSH Status and forwards jump-to-session commands.",
   "type": "module",
   "license": "MIT",
@@ -62,6 +62,6 @@
   },
   "engines": {
     "node": ">=20",
-    "dsh": ">=0.2.1-rc.5 <0.3.0"
+    "dsh": ">=0.2.2-rc.2 <0.3.0"
   }
 }

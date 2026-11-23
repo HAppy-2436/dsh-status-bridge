@@ -225,11 +225,19 @@ Client 行为要求：
 
 ## 4. Host 实现要点
 
-- webserver 路由：`ctx.webServer.register({ kind: 'prefix', path: '/dsh-status', handler })`，
+- webserver 路由：`ctx.webServer.register({ kind: 'prefix', path: '/dsh-status', auth: 'anonymous', handler })`，
   handler 为 `(req, res) => void` 原生 Node 风格。
+  **`auth: 'anonymous'` 必须显式声明**：DSH 0.2.3 起 webServer 的默认准入是 `required`，
+  没有 DSH 登录态的原生 App 会在进入 handler 之前被 401 拦掉（App 只看到 `unauthorized` 文本、
+  SSE 永远收不到 `state` 事件）。桥在 handler 内自己完成下面两条鉴权，因此对 webServer 声明
+  anonymous，安全模型与 0.2.3 之前一致（仅回环 + token / `admit`）。
 - Native 请求鉴权：校验 `Authorization` 头 token；并校验 `req.headers.host` 指向回环。
 - Client 请求鉴权：`new Request('http://127.0.0.1' + req.url, { method, headers: new Headers(req.headers) })`
   后调用 `ctx.connection.admit(request)`，拒绝则 401/403（实现细节可简化，但必须拒绝未认证请求）。
+  **DSH 0.2.2-rc.2 起必须在声明了 `connection.authentication` 的 fiber 里调用 `admit`**
+  （例如 `ctx.inject(['connection', 'connection.authentication'], (admitCtx) => …)`）：
+  服务读取按调用方 fiber 的 `inject` 鉴权，直接调用会抛
+  `cannot get property "connection.authentication" without inject`，浏览器半的请求全部 401。
 - `lastTurn` 缓存：`ctx.on('session/event', { global: true }, (session, event) => { if (event.type === 'turn/end') lastTurn.set(...) })`。
 - 状态变化时向所有 SSE 客户端广播完整 `BridgeState`（无需增量）。
 - 卸载时：清理路由、关闭 SSE、删除 `bridge.json`（尽力而为）。

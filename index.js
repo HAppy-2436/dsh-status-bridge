@@ -47,6 +47,11 @@ export function apply(ctx, config = {}) {
   const bridgeFile = path.join(bridgeDir, 'bridge.json')
   const token = randomBytes(32).toString('hex')
   const startedAt = Date.now()
+  // DSH 0.2.2-rc.2 起，服务读取按「调用方 fiber 的 inject」鉴权：Connection.admit 内部要读
+  // connection.authentication，直接调用会抛 `cannot get property "connection.authentication"
+  // without inject`，浏览器半的请求全部 401。把这次调用放进声明了该服务的子 fiber；
+  // 老版本（没有这个服务）子 fiber 保持 pending，回退到直接调用。
+  let admitBrowserRequest = (request) => ctx.connection.admit(request)
 
   const hostAgents = typeof ctx.get === 'function' ? ctx.get('agents') : undefined
   const hostProjections = typeof ctx.get === 'function' ? ctx.get('sessionProjections') : undefined
@@ -350,7 +355,7 @@ export function apply(ctx, config = {}) {
         else if (Array.isArray(value)) headers.set(key, value.join(', '))
       }
       const request = new Request(`http://127.0.0.1${req.url}`, { method: req.method, headers })
-      const admission = ctx.connection.admit(request)
+      const admission = admitBrowserRequest(request)
       return Boolean(admission) && !('rejection' in admission)
     } catch (error) {
       console.warn('[dsh-status] 浏览器鉴权失败：', error)
@@ -380,9 +385,30 @@ export function apply(ctx, config = {}) {
 
   // ---------- 生命周期 ----------
 
+  if (typeof ctx.inject === 'function') {
+    ctx.effect(() => {
+      const admissionFiber = ctx.inject(['connection', 'connection.authentication'], (admitCtx) => {
+        admitBrowserRequest = (request) => admitCtx.connection.admit(request)
+      })
+      return () => {
+        admitBrowserRequest = (request) => ctx.connection.admit(request)
+        try { admissionFiber?.dispose?.() } catch {}
+      }
+    }, 'dsh-status: connection admission')
+  }
+
   ctx.effect(() => {
     writeBridgeFile()
-    const disposeRoute = ctx.webServer.register({ kind: 'prefix', path: PREFIX, handler: handleRequest })
+    // DSH 0.2.3 起 webServer 的默认 auth 是 'required'：没带 DSH 登录态的原生 App 会在进入
+    // handler 前被 401 挡掉（0.1.6 及更早即因此断连）。本路由自己鉴权——原生接口校验回环
+    // Host + Bearer token，Client 接口用 ctx.connection.admit——所以显式声明 anonymous，
+    // 把准入交回桥，保持与 0.2.3 之前完全相同的安全模型。
+    const disposeRoute = ctx.webServer.register({
+      kind: 'prefix',
+      path: PREFIX,
+      auth: 'anonymous',
+      handler: handleRequest,
+    })
     const disposeSessionEvent = ctx.on('session/event', onSessionEvent, { global: true })
     heartbeatTimer = setInterval(() => {
       // bridge.json 自愈：文件被删除时重写（App 2s 轮询发现路径）

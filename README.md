@@ -17,8 +17,9 @@ The plugin has two halves:
 ## Requirements
 
 - macOS (the companion app is a menu bar app)
-- DSH desktop **0.2.1-rc.5** or newer in the 0.2.x line (verified on `0.2.1-rc.5`
-  and `0.2.2-rc.1`)
+- DSH desktop **0.2.2-rc.2** or newer in the 0.2.x line (verified on `0.2.3-alpha.2`).
+  0.2.2-rc.2 changed route admission, service-inject checks, and the Session
+  status service; earlier 0.2.x releases cannot run this plugin.
 - Node.js **>= 20** (bundled with DSH, nothing to install manually)
 - The companion app installed first: [dsh-status releases](https://github.com/HAppy-2436/dsh-status/releases)
 
@@ -67,9 +68,21 @@ ignores unknown keys, so plugin and app can be upgraded independently.
 
 | DSH | Status |
 | --- | --- |
-| `0.2.1-rc.5` | verified on device |
-| `0.2.2-rc.1` | verified on device |
-| older than `0.2.1-rc.5` or `>= 0.3.0` | unsupported (declared in `engines.dsh`) |
+| `0.2.3-alpha.2` | verified on device |
+| `0.2.2-rc.2` – `0.2.2-rc.5` | expected to work (same APIs, not verified on device) |
+| older than `0.2.2-rc.2` or `>= 0.3.0` | unsupported (declared in `engines.dsh`) |
+
+DSH 0.2.3 made web server admission default to `required`. The bridge therefore
+registers its route with `auth: 'anonymous'` and keeps authenticating inside the
+handler (loopback `Host` + bearer token for the app, `connection.admit` for the
+browser half). Since DSH 0.2.2-rc.2 reads services against the calling fiber's
+`inject`, that `admit` call runs inside a child fiber declaring
+`connection.authentication`; older DSH without the service keeps the direct call.
+
+DSH 0.2.2-rc.2 also turned `ctx.uiSession.sessionStatus` into a service that a
+client plugin must inject (`uiSession.sessionStatus`), so the bridge declares it
+together with the other Session services. Plugin versions before 0.1.8 miss the
+anonymous admission or the injection and appear as "cannot connect" on 0.2.3+.
 
 ## Session filtering
 

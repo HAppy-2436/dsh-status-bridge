@@ -16,7 +16,9 @@ window.__ModuleLoader__.load({
     const RETRY_DELAYS_MS = [1000, 2000, 5000]
 
     return {
-      inject: ['uiSession', 'sessions', 'workspaces', 'uiWorkspace'],
+      // DSH 0.2.2-rc.2 起 `uiSession.sessionStatus` 是独立服务：不注入就读取会抛
+      // "cannot get property ... without inject"，apply 直接失败 → 一条状态都不上报。
+      inject: ['uiSession', 'uiSession.sessionStatus', 'sessions', 'workspaces', 'uiWorkspace'],
       apply(ctx) {
         const runtime = {
           stopped: false,

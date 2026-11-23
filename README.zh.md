@@ -17,7 +17,8 @@ macOS 菜单栏 App，并把 App 里的「跳转到会话」命令回传给 DSH�
 ## 前置条件
 
 - macOS（配套 App 是菜单栏 App）
-- DSH desktop **0.2.1-rc.5** 及以上（0.2.x 系列；已在 `0.2.1-rc.5`、`0.2.2-rc.1` 实机验证）
+- DSH desktop **0.2.2-rc.2** 及以上（0.2.x 系列；已在 `0.2.3-alpha.2` 实机验证）。
+  0.2.2-rc.2 改了路由准入、服务注入校验与会话状态服务，更早的 0.2.x 无法运行本插件。
 - Node.js **>= 20**（DSH 自带，无需手动安装）
 - 先安装配套 App：[dsh-status releases](https://github.com/HAppy-2436/dsh-status/releases)
 
@@ -61,9 +62,19 @@ App 路径按以下顺序探测，把第一个存在的路径写进 `bridge.json
 
 | DSH | 状态 |
 | --- | --- |
-| `0.2.1-rc.5` | 实机验证通过 |
-| `0.2.2-rc.1` | 实机验证通过 |
-| 低于 `0.2.1-rc.5` 或 `>= 0.3.0` | 不支持（见 `engines.dsh`） |
+| `0.2.3-alpha.2` | 实机验证通过 |
+| `0.2.2-rc.2` – `0.2.2-rc.5` | 预期可用（API 相同，未实机验证） |
+| 低于 `0.2.2-rc.2` 或 `>= 0.3.0` | 不支持（见 `engines.dsh`） |
+
+DSH 0.2.3 起 web server 的默认准入变成 `required`。桥因此显式用 `auth: 'anonymous'`
+注册路由，并在 handler 内自己鉴权（原生 App 用回环 `Host` + Bearer token，浏览器半用
+`connection.admit`）。DSH 0.2.2-rc.2 起服务读取按调用方 fiber 的 `inject` 鉴权，所以
+`admit` 放在声明了 `connection.authentication` 的子 fiber 里调用；没有该服务的老版本
+回退到直接调用。
+
+DSH 0.2.2-rc.2 还把 `ctx.uiSession.sessionStatus` 改成需要注入
+（`uiSession.sessionStatus`）的独立服务，桥在 Client 半的 `inject` 里一并声明。0.1.8
+之前的版本缺前者或缺后者，在 0.2.3+ 上都会表现为「连接不上」或「连上但没有会话行」。
 
 ## 会话过滤
 

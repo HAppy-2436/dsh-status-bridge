@@ -13,6 +13,7 @@ function createFakeCtx() {
   const routes = new Map()
   const listeners = new Map()
   const effectCleanups = []
+  const injectCalls = []
 
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url ?? '/', 'http://127.0.0.1').pathname
@@ -25,6 +26,13 @@ function createFakeCtx() {
     if (!matched) {
       res.writeHead(404)
       res.end()
+      return
+    }
+    // 模拟 DSH 0.2.3+ 的 webServer 准入：默认 'required'，未声明 anonymous 的路由
+    // 在进入 handler 前就被 401 拦掉（原生 App 没有 DSH 登录态）。
+    if (matched.auth !== 'anonymous') {
+      res.writeHead(401, { 'cache-control': 'no-store' })
+      res.end('unauthorized')
       return
     }
     matched.handler(req, res)
@@ -46,6 +54,12 @@ function createFakeCtx() {
   const ctx = {
     webServer,
     connection,
+    // 模拟 Cordis 的 `ctx.inject(deps, callback)`：回调拿到一个声明了依赖的子 ctx。
+    inject(deps, callback) {
+      injectCalls.push([...deps])
+      callback({ connection })
+      return { dispose() {} }
+    },
     effect(fn) {
       const dispose = fn()
       if (typeof dispose === 'function') effectCleanups.push(dispose)
@@ -65,6 +79,7 @@ function createFakeCtx() {
     server,
     routes,
     listeners,
+    injectCalls,
     async listen() {
       await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     },
@@ -122,6 +137,11 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     const health = await jsonRequest(`${base}/dsh-status/health`)
     assert.equal(health.status, 200)
     assert.equal(health.body.ok, true)
+
+    // DSH 0.2.3 起 webServer 默认 auth='required'；桥必须显式 anonymous，自己校验 token / admit
+    assert.equal(fake.routes.get('/dsh-status')?.auth, 'anonymous')
+    // DSH 0.2.2-rc.2 起 admit 需要在声明了 connection.authentication 的 fiber 里调用
+    assert.deepEqual(fake.injectCalls[0], ['connection', 'connection.authentication'])
 
     // 原生接口需要 Bearer
     assert.equal((await jsonRequest(`${base}/dsh-status/state`)).status, 401)
