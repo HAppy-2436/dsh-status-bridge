@@ -2,37 +2,56 @@
 
 [English README](README.md)
 
-把 DeepSeek Harness（DSH）的会话状态桥接到 [DSH Status](https://github.com/HAppy-2436/dsh-status)
-macOS 菜单栏 App，并把 App 里的「跳转到会话」命令回传给 DSH。
+把 DeepSeek Harness（DSH）的**通知与会话状态**接到 macOS：会话完成、出错或等待你输入时
+发系统通知；装上 [DSH Status](https://github.com/HAppy-2436/dsh-status) App 后，还会把
+状态显示在菜单栏，并支持点击跳转、声音与勿扰。
+
+想对比通知方案？见
+[DSH 通知与状态：方案对比](https://github.com/HAppy-2436/dsh-status/blob/main/docs/notifications.zh.md)。
 
 ## 组成
 
 | 文件 | 作用 |
 | --- | --- |
-| `index.js` | Host 桥：注册 `/dsh-status` 路由（状态 / SSE / 命令），监听 `turn/end` 区分「已完成」与「已停止」、给焦点会话补 `notices`，写 `~/.dsh-status/bridge.json`，可选拉起 App |
+| `index.js` | Host 桥：注册 `/dsh-status` 路由（状态 / SSE / 命令），监听 `turn/end` 区分「已完成」与「已停止」、给焦点会话补 `notices`，写 `~/.dsh-status/bridge.json`，发独立通知，可选拉起 App |
 | `client.js` | Client 半（DSH 渲染进程内，无 UI）：聚合 `uiSession` / `sessions` / `workspaces` 状态推给 Host；长轮询执行 `uiWorkspace.openSession` |
 | `lib/aggregate.js` | 纯函数：状态推导 / 计数 / 快照校验（Host 与测试共用） |
+| `lib/notify.js` | 纯函数：哪些状态变化需要发独立通知 |
 | `test/` | `node --test` 单元测试 + Host 路由集成测试 + Client 半假 ctx 测试 |
 
 ## 前置条件
 
-- macOS（配套 App 是菜单栏 App）
+- macOS（通知与配套 App 都需要；Host 桥本身是纯 Node.js）
 - DSH desktop **0.2.2-rc.2** 及以上（0.2.x 系列；已在 `0.2.3-alpha.2` 实机验证）。
   0.2.2-rc.2 改了路由准入、服务注入校验与会话状态服务，更早的 0.2.x 无法运行本插件。
 - Node.js **>= 20**（DSH 自带，无需手动安装）
-- 先安装配套 App：[dsh-status releases](https://github.com/HAppy-2436/dsh-status/releases)
+- 配套 App **可选**：不装 App 也能收到基础系统通知；装
+  [DSH Status App](https://github.com/HAppy-2436/dsh-status/releases) 后才有菜单栏面板、
+  点击跳转、声音与勿扰。
 
 ## 安装
 
-1. 安装 **DSH Status** App（DMG 拖到 `/Applications`，或用安装脚本装到 `~/Applications`）。
-2. 打开 DSH：左侧边栏 **Plugins** → **Add plugin** → **Install a third-party plugin**
+1. 打开 DSH：左侧边栏 **Plugins** → **Add plugin** → **Install a third-party plugin**
    → 包名输入 `dsh-status-bridge` → **Install** → **Enable now**。
-   若 registry 上没有 0.1.8 或更高版本，可在同一输入框改填 Git 地址
+   若 registry 上没有 0.1.9 或更高版本，可在同一输入框改填 Git 地址
    `github:HAppy-2436/dsh-status-bridge`。
-3. 插件激活后写 `~/.dsh-status/bridge.json` 并尝试拉起 App；菜单栏出现鲸鱼/分段圆环图标即接入成功。
-4. 点击 App 面板里的会话行会跳转到 DSH 对应会话。
+2. 插件激活后写 `~/.dsh-status/bridge.json`，开始发完成 / 出错 / 等待输入的 macOS 通知。
+3. **可选：** 安装 [DSH Status App](https://github.com/HAppy-2436/dsh-status/releases)
+   （DMG 拖到 `/Applications`）。插件发现 App 后会自动拉起；App 接管通知，并增加菜单栏面板。
 
 如果 App 没有被自动拉起：手动启动一次即可。
+
+## 不装 App 时的通知
+
+App 没连上时，插件在每次有意义的状态变化时发一条通知：
+
+- 会话**等待**你输入或审批；
+- 一轮对话**完成**；
+- 一轮对话**出错停止**。
+
+你自己按停止不会通知。通知优先走 `terminal-notifier`，没装则退到 `osascript`；
+没有 App 时点击跳转和提示音受限。App 连上后插件保持安静，由 App 接管通知。
+可用 `fallbackNotifications: false` 关闭。
 
 ## 配置
 
@@ -43,6 +62,8 @@ macOS 菜单栏 App，并把 App 里的「跳转到会话」命令回传给 DSH�
   config:
     # 可选：显式指定 App 路径
     appPath: /Applications/DSH Status.app
+    # App 没连上时由插件发基础 macOS 通知（默认 true）
+    fallbackNotifications: true
 ```
 
 App 路径按以下顺序探测，把第一个存在的路径写进 `bridge.json` 的 `appPath` 字段：
@@ -143,20 +164,17 @@ DSH_STATUS_DIR=/tmp/dsh-status-dev node test/dev-host.mjs
 
 ## 发布
 
-由 `.github/workflows/publish.yml` 在 tag 上发布（npm **Trusted Publishing / OIDC**，
-不需要长期 token，也不需要 OTP；首次使用前需在 npmjs.com 包设置里配置
-Trusted Publisher：GitHub Actions + 仓库 `HAppy-2436/dsh-status-bridge` +
-workflow `publish.yml` + 允许 `npm publish`）：
+维护者在本机登录 npm 后：
 
 ```bash
-npm version patch --no-git-tag-version
-git commit -am "chore: release v0.1.1"
-git tag v0.1.1
-git push origin main --tags
+npm run check
+npm test
+npm publish --access public
 ```
 
-workflow 会先跑校验和测试，然后用 OIDC 短期令牌执行
-`npm publish --access public --provenance`（自动生成 provenance）；不要在本地手动 publish。
+tag 必须与 `package.json` 版本一致（`v0.1.9` → `0.1.9`）。`.github/workflows/publish.yml`
+是可选自动化：在 npm Trusted Publishing 配置启用后，推 tag 即可自动发布；在那之前先本机
+发布，再推同名 tag。
 
 ## 许可证
 

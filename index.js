@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { execFileSync, spawn } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -12,6 +12,7 @@ import {
   noticeStatusFor,
   pruneNotices,
 } from './lib/aggregate.js'
+import { planNotifications } from './lib/notify.js'
 
 /**
  * DSH Status 桥（Host 薄桥）：
@@ -73,6 +74,12 @@ export function apply(ctx, config = {}) {
   const origin = ctx.webServer.getOrigin ? ctx.webServer.getOrigin() : `http://127.0.0.1:${ctx.webServer.port}`
   const port = ctx.webServer.port
   const appPath = resolveAppPath(config?.appPath)
+  // 独立可用：App 没连上时，插件自己发基础 macOS 通知；App 连上后由 App 接管（更丰富的
+  // 面板/跳转/声音/勿扰）。非 macOS 或显式关闭时不发。
+  const fallbackNotifications = config?.fallbackNotifications !== false && process.platform === 'darwin'
+  const APP_GRACE_MS = 10_000
+  let lastAppSeenAt = 0
+  let observedStatuses = new Map()
 
   // ---------- bridge.json ----------
 
@@ -143,9 +150,22 @@ export function apply(ctx, config = {}) {
     })
   }
 
+  function maybeNotifyFallback(state) {
+    if (!fallbackNotifications) return
+    const { events, next } = planNotifications(observedStatuses, state.sessions)
+    observedStatuses = next
+    // App 正在收听（或刚断开不到 10s）：把状态记下但不重复弹，避免 App 和插件各弹一次。
+    if (sseClients.size > 0) return
+    if (Date.now() - lastAppSeenAt < APP_GRACE_MS) return
+    for (const event of events) notifyMac(event)
+  }
+
   function broadcastState() {
+    if (sseClients.size === 0 && !fallbackNotifications) return
+    const state = currentState()
+    maybeNotifyFallback(state)
     if (sseClients.size === 0) return
-    const payload = `event: state\ndata: ${JSON.stringify(currentState())}\n\n`
+    const payload = `event: state\ndata: ${JSON.stringify(state)}\n\n`
     for (const response of sseClients) {
       try {
         response.write(payload)
@@ -338,6 +358,7 @@ export function apply(ctx, config = {}) {
     })
     res.write(`event: state\ndata: ${JSON.stringify(currentState())}\n\n`)
     sseClients.add(res)
+    lastAppSeenAt = Date.now()
     res.on('close', () => sseClients.delete(res))
   }
 
@@ -479,6 +500,45 @@ async function readJson(req) {
 
 function isLoopbackHost(host) {
   return /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host)
+}
+
+function notifyMac(event) {
+  const title = 'DSH Status'
+  const subtitle = event.title
+  const body = event.body
+  const terminalNotifier = findTerminalNotifier()
+  if (terminalNotifier) {
+    execFile(
+      terminalNotifier,
+      ['-title', title, '-subtitle', subtitle, '-message', body, '-group', `dsh-status-${event.id}`],
+      (error) => {
+        if (error) notifyWithAppleScript(title, subtitle, body)
+      },
+    )
+    return
+  }
+  notifyWithAppleScript(title, subtitle, body)
+}
+
+function notifyWithAppleScript(title, subtitle, body) {
+  const script = `display notification ${appleScriptLiteral(body)} with title ${appleScriptLiteral(title)} subtitle ${appleScriptLiteral(subtitle)}`
+  execFile('/usr/bin/osascript', ['-e', script], () => {})
+}
+
+function findTerminalNotifier() {
+  const candidates = [
+    '/opt/homebrew/bin/terminal-notifier',
+    '/usr/local/bin/terminal-notifier',
+    path.join(homedir(), '.npm-global/bin/terminal-notifier'),
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+function appleScriptLiteral(value) {
+  return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
 /**

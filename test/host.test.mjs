@@ -105,7 +105,7 @@ async function setup() {
   const fake = createFakeCtx()
   await fake.listen()
   const { apply } = await import('../index.js')
-  apply(fake.ctx, { appPath: fakeApp })
+  apply(fake.ctx, { appPath: fakeApp, fallbackNotifications: false })
   const bridge = JSON.parse(await readFile(path.join(stateDir, 'bridge.json'), 'utf8'))
   const base = `http://127.0.0.1:${bridge.port}`
   const auth = { authorization: `Bearer ${bridge.token}` }

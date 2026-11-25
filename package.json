@@ -1,7 +1,7 @@
 {
   "name": "dsh-status-bridge",
-  "version": "0.1.8",
-  "description": "DSH plugin that bridges DeepSeek Harness session status to the macOS menu bar app DSH Status and forwards jump-to-session commands.",
+  "version": "0.1.9",
+  "description": "DSH notifications and native macOS menu bar status: get notified when a session completes, errors, or waits for approval, then jump back.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -18,8 +18,14 @@
     "dsh",
     "dsh-plugin",
     "client-plugin",
+    "notification",
+    "notify",
+    "completion",
+    "approval",
+    "alert",
     "macos",
     "menu-bar",
+    "menubar",
     "status",
     "session",
     "bridge"
@@ -35,6 +41,7 @@
     "index.js",
     "client.js",
     "lib/aggregate.js",
+    "lib/notify.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
@@ -58,7 +65,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check index.js && node --check client.js && node --check lib/aggregate.js"
+    "check": "node --check index.js && node --check client.js && node --check lib/aggregate.js && node --check lib/notify.js"
   },
   "engines": {
     "node": ">=20",

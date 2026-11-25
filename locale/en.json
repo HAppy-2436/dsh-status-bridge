@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "DSH Status Bridge",
-    "description": "Exposes DSH session status to the macOS menu bar app and forwards jump-to-session commands."
+    "description": "Notifies you when a DSH session completes, errors, or waits for your input — and shows live status in the macOS menu bar."
   }
 }
