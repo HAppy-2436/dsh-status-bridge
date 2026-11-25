@@ -26,8 +26,8 @@ macOS 菜单栏 App，并把 App 里的「跳转到会话」命令回传给 DSH�
 
 1. 安装 **DSH Status** App（DMG 拖到 `/Applications`，或用安装脚本装到 `~/Applications`）。
 2. 打开 DSH：左侧边栏 **Plugins** → **Add plugin** → **Install a third-party plugin**
-   → 包名输入 `dsh-status-bridge` → **Install** → **Enable now**。
-   （若 npm 包尚不可用，在同一输入框改填 Git 地址 `github:HAppy-2436/dsh-status-bridge`。）
+   → 输入 Git 地址 `github:HAppy-2436/dsh-status-bridge` → **Install** → **Enable now**。
+   npm 包名 `dsh-status-bridge` 在 0.1.8 或更高版本发布后同样可用。
 3. 插件激活后写 `~/.dsh-status/bridge.json` 并尝试拉起 App；菜单栏出现鲸鱼/分段圆环图标即接入成功。
 4. 点击 App 面板里的会话行会跳转到 DSH 对应会话。
 
