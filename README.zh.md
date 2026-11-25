@@ -9,6 +9,9 @@
 想对比通知方案？见
 [DSH 通知与状态：方案对比](https://github.com/HAppy-2436/dsh-status/blob/main/docs/notifications.zh.md)。
 
+> **可选的菜单栏 App：** [下载 DSH Status](https://github.com/HAppy-2436/dsh-status/releases/latest)。
+> 不装 App 也能收基础通知；App 额外提供菜单栏面板、点击跳转、提示音与勿扰。
+
 ## 组成
 
 | 文件 | 作用 |
@@ -33,7 +36,7 @@
 
 1. 打开 DSH：左侧边栏 **Plugins** → **Add plugin** → **Install a third-party plugin**
    → 包名输入 `dsh-status-bridge` → **Install** → **Enable now**。
-   若 registry 上没有 0.1.9 或更高版本，可在同一输入框改填 Git 地址
+   若 registry 上没有 0.1.10 或更高版本，可在同一输入框改填 Git 地址
    `github:HAppy-2436/dsh-status-bridge`。
 2. 插件激活后写 `~/.dsh-status/bridge.json`，开始发完成 / 出错 / 等待输入的 macOS 通知。
 3. **可选：** 安装 [DSH Status App](https://github.com/HAppy-2436/dsh-status/releases)
@@ -52,6 +55,11 @@ App 没连上时，插件在每次有意义的状态变化时发一条通知：
 你自己按停止不会通知。通知优先走 `terminal-notifier`，没装则退到 `osascript`；
 没有 App 时点击跳转和提示音受限。App 连上后插件保持安静，由 App 接管通知。
 可用 `fallbackNotifications: false` 关闭。
+
+## 命令
+
+- `/dsh-status` — 查看桥版本、会话计数、菜单栏 App 是否已安装，以及下载链接。
+  收不到通知时，这也是最快的排查入口。
 
 ## 配置
 
@@ -172,7 +180,7 @@ npm test
 npm publish --access public
 ```
 
-tag 必须与 `package.json` 版本一致（`v0.1.9` → `0.1.9`）。`.github/workflows/publish.yml`
+tag 必须与 `package.json` 版本一致（`v0.1.10` → `0.1.10`）。`.github/workflows/publish.yml`
 是可选自动化：在 npm Trusted Publishing 配置启用后，推 tag 即可自动发布；在那之前先本机
 发布，再推同名 tag。
 

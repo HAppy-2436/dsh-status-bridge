@@ -34,6 +34,7 @@ const DEFAULT_APP_PATHS = [
   '/Applications/DSH Status.app',
   path.join(homedir(), 'Applications', 'DSH Status.app'),
 ]
+const APP_URL = 'https://github.com/HAppy-2436/dsh-status/releases/latest'
 
 export const inject = ['webServer', 'connection']
 
@@ -74,6 +75,7 @@ export function apply(ctx, config = {}) {
   const origin = ctx.webServer.getOrigin ? ctx.webServer.getOrigin() : `http://127.0.0.1:${ctx.webServer.port}`
   const port = ctx.webServer.port
   const appPath = resolveAppPath(config?.appPath)
+  const commands = typeof ctx.get === 'function' ? ctx.get('commands') : undefined
   // 独立可用：App 没连上时，插件自己发基础 macOS 通知；App 连上后由 App 接管（更丰富的
   // 面板/跳转/声音/勿扰）。非 macOS 或显式关闭时不发。
   const fallbackNotifications = config?.fallbackNotifications !== false && process.platform === 'darwin'
@@ -148,6 +150,21 @@ export function apply(ctx, config = {}) {
       lastPushAt,
       now: Date.now(),
     })
+  }
+
+  function statusReport() {
+    const state = currentState()
+    const counts = state.counts
+    const lines = [
+      `DSH Status bridge ${PLUGIN_VERSION}`,
+      `Sessions: ${counts.running} running, ${counts.waiting} waiting, ${counts.completed} completed, ${counts.stopped} stopped`,
+      appPath
+        ? `Menu bar app: installed (${appPath})`
+        : 'Menu bar app: not installed — basic notifications are active.',
+    ]
+    if (!appPath) lines.push(`Optional menu bar panel: ${APP_URL}`)
+    if (!state.client.connected) lines.push('DSH client snapshot: not connected yet.')
+    return lines.join('\n')
   }
 
   function maybeNotifyFallback(state) {
@@ -443,6 +460,9 @@ export function apply(ctx, config = {}) {
       }
     }, HEARTBEAT_MS)
     scheduleAppLaunch()
+    if (!appPath) {
+      console.info(`[dsh-status] basic notifications active; menu bar app not found. Optional app: ${APP_URL}`)
+    }
 
     return () => {
       disposed = true
@@ -462,6 +482,21 @@ export function apply(ctx, config = {}) {
       removeBridgeFile()
     }
   }, 'dsh-status: bridge')
+
+  ctx.effect(() => {
+    if (!commands || typeof commands.register !== 'function') return
+    return commands.register({
+      name: 'dsh-status',
+      description: 'Show DSH Status bridge status and the optional menu bar app link',
+      handler: () => {
+        try {
+          return { kind: 'success', text: statusReport() }
+        } catch (error) {
+          return { kind: 'error', text: `DSH Status: ${String(error)}` }
+        }
+      },
+    })
+  }, 'dsh-status: command')
 }
 
 // ---------- 工具 ----------

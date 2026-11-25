@@ -9,6 +9,10 @@ the menu bar panel, click-to-jump, sounds, and Do Not Disturb.
 Comparing notification plugins? See
 [DSH notifications and status: comparing the options](https://github.com/HAppy-2436/dsh-status/blob/main/docs/notifications.md).
 
+> **Optional menu bar app:** [Download DSH Status](https://github.com/HAppy-2436/dsh-status/releases/latest).
+> The plugin sends basic notifications without it; the app adds the menu bar panel,
+> click-to-jump, sounds, and Do Not Disturb.
+
 The plugin has two halves:
 
 | File | Role |
@@ -35,7 +39,7 @@ The plugin has two halves:
 
 1. In DSH: sidebar **Plugins** → **Add plugin** → **Install a third-party plugin**
    → enter the package name `dsh-status-bridge` → **Install** → **Enable now**.
-   If your registry does not have 0.1.9 or newer, paste the Git URL
+   If your registry does not have 0.1.10 or newer, paste the Git URL
    `github:HAppy-2436/dsh-status-bridge` in the same field instead.
 2. The plugin writes `~/.dsh-status/bridge.json` and starts sending basic macOS
    notifications for completion, errors, and waiting-for-input events.
@@ -59,6 +63,12 @@ It never notifies for a stop you triggered yourself. Notifications use
 and sounds are limited without the app. Once the app connects, the plugin keeps
 quiet and the app owns notifications. Disable the fallback with
 `fallbackNotifications: false`.
+
+## Commands
+
+- `/dsh-status` — show the bridge version, session counts, whether the menu bar
+  app is installed, and the download link. This is also the quickest way to see
+  what the plugin is doing when notifications do not arrive.
 
 ## Configuration
 
@@ -196,7 +206,7 @@ npm test
 npm publish --access public
 ```
 
-The tag must match `package.json` (`v0.1.9` → `0.1.9`). The optional
+The tag must match `package.json` (`v0.1.10` → `0.1.10`). The optional
 `.github/workflows/publish.yml` automates the same steps with npm Trusted
 Publishing once its OIDC configuration is enabled; until then, publish locally
 and push a matching tag.

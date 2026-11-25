@@ -1,6 +1,6 @@
 {
   "name": "dsh-status-bridge",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "DSH notifications and native macOS menu bar status: get notified when a session completes, errors, or waits for approval, then jump back.",
   "type": "module",
   "license": "MIT",

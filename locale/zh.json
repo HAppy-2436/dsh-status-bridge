@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "DSH Status 桥",
-    "description": "DSH 会话完成、出错或等待输入时通知你，并在 macOS 菜单栏显示实时状态。"
+    "description": "DSH 会话完成、出错或等待输入时通知你；可选装 macOS 菜单栏 App 查看实时状态。"
   }
 }

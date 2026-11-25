@@ -51,9 +51,21 @@ function createFakeCtx() {
     admit: () => ({ peer: { id: 'browser' } }),
   }
 
+  const commandDefs = new Map()
+  const commands = {
+    register(definition) {
+      commandDefs.set(definition.name, definition)
+      return () => commandDefs.delete(definition.name)
+    },
+  }
+
   const ctx = {
     webServer,
     connection,
+    commands,
+    get(service) {
+      return service === 'commands' ? commands : undefined
+    },
     // 模拟 Cordis 的 `ctx.inject(deps, callback)`：回调拿到一个声明了依赖的子 ctx。
     inject(deps, callback) {
       injectCalls.push([...deps])
@@ -80,6 +92,7 @@ function createFakeCtx() {
     routes,
     listeners,
     injectCalls,
+    commandDefs,
     async listen() {
       await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     },
@@ -142,6 +155,14 @@ test('Host 桥：bridge.json / 鉴权 / 状态合并 / 命令 / SSE / 卸载', a
     assert.equal(fake.routes.get('/dsh-status')?.auth, 'anonymous')
     // DSH 0.2.2-rc.2 起 admit 需要在声明了 connection.authentication 的 fiber 里调用
     assert.deepEqual(fake.injectCalls[0], ['connection', 'connection.authentication'])
+
+    // /dsh-status 命令：状态报告 + 可选 App 的提示
+    const commandDefinition = fake.commandDefs.get('dsh-status')
+    assert.ok(commandDefinition, '/dsh-status should be registered')
+    const commandResult = commandDefinition.handler({})
+    assert.equal(commandResult.kind, 'success')
+    assert.match(commandResult.text, /DSH Status bridge/)
+    assert.match(commandResult.text, /Menu bar app: installed/)
 
     // 原生接口需要 Bearer
     assert.equal((await jsonRequest(`${base}/dsh-status/state`)).status, 401)
