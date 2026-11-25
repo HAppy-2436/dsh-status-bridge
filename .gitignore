@@ -11,3 +11,6 @@ build/
 .env.local
 .ipynb_checkpoints/
 *.tgz
+
+# 维护者本地工作日志（含内部进度，不纳入公开仓库）
+STATUS.md
