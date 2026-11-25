@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "DSH Status Bridge",
-    "description": "Notifies you when a DSH session completes, errors, or waits for your input — and shows live status in the optional macOS menu bar app."
+    "title": "DSH Status Bridge — Menu Bar",
+    "description": "Menu bar status + notifications for DSH: see running and waiting sessions at a glance, and get notified when one needs you. Works standalone; the free app adds the panel."
   }
 }

@@ -1,17 +1,30 @@
 # DSH Status Bridge
 
-A [DeepSeek Harness](https://github.com/deepseek-ai) (DSH) plugin for **notifications
-and status**. It sends native macOS notifications when a session finishes, errors,
-or waits for your input, and bridges live session status to the
-[DSH Status](https://github.com/HAppy-2436/dsh-status) menu bar app. The app adds
-the menu bar panel, click-to-jump, sounds, and Do Not Disturb.
+**DSH session status in your macOS menu bar — plus notifications when a session
+needs you.**
+
+The plugin works on its own for basic macOS notifications. The free
+[DSH Status app](https://github.com/HAppy-2436/dsh-status/releases/latest) adds the
+native menu bar panel, badge, click-to-jump, sounds, and Do Not Disturb.
+
+Notification plugins tell you that a turn ended. DSH Status shows you what is
+happening: which sessions are running, which need you, and one click back to the
+session.
+
+## Why this one
+
+The difference is the panel, not another banner. DSH Status keeps a native
+macOS menu bar view of your sessions: per-session status, a badge for what needs
+you, subagents folded under their parent, and a click that opens the session.
+The plugin still works without the app — the app is the full experience, not a
+prerequisite.
 
 Comparing notification plugins? See
 [DSH notifications and status: comparing the options](https://github.com/HAppy-2436/dsh-status/blob/main/docs/notifications.md).
 
-> **Optional menu bar app:** [Download DSH Status](https://github.com/HAppy-2436/dsh-status/releases/latest).
-> The plugin sends basic notifications without it; the app adds the menu bar panel,
-> click-to-jump, sounds, and Do Not Disturb.
+> **Get the full experience:** [Download DSH Status](https://github.com/HAppy-2436/dsh-status/releases/latest).
+> The plugin alone sends basic notifications; the app adds the menu bar panel,
+> badge, click-to-jump, sounds, and Do Not Disturb.
 
 The plugin has two halves:
 
@@ -39,7 +52,7 @@ The plugin has two halves:
 
 1. In DSH: sidebar **Plugins** → **Add plugin** → **Install a third-party plugin**
    → enter the package name `dsh-status-bridge` → **Install** → **Enable now**.
-   If your registry does not have 0.1.10 or newer, paste the Git URL
+   If your registry does not have 0.1.11 or newer, paste the Git URL
    `github:HAppy-2436/dsh-status-bridge` in the same field instead.
 2. The plugin writes `~/.dsh-status/bridge.json` and starts sending basic macOS
    notifications for completion, errors, and waiting-for-input events.
@@ -206,7 +219,7 @@ npm test
 npm publish --access public
 ```
 
-The tag must match `package.json` (`v0.1.10` → `0.1.10`). The optional
+The tag must match `package.json` (`v0.1.11` → `0.1.11`). The optional
 `.github/workflows/publish.yml` automates the same steps with npm Trusted
 Publishing once its OIDC configuration is enabled; until then, publish locally
 and push a matching tag.

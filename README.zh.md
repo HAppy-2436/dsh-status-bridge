@@ -2,15 +2,25 @@
 
 [English README](README.md)
 
-把 DeepSeek Harness（DSH）的**通知与会话状态**接到 macOS：会话完成、出错或等待你输入时
-发系统通知；装上 [DSH Status](https://github.com/HAppy-2436/dsh-status) App 后，还会把
-状态显示在菜单栏，并支持点击跳转、声音与勿扰。
+**把 DSH 会话状态放进 macOS 菜单栏，并在会话需要你时通知你。**
+
+插件不装 App 也能发基础通知；装上免费的
+[DSH Status App](https://github.com/HAppy-2436/dsh-status/releases/latest) 后，才有原生
+菜单栏面板、角标、点击跳转、提示音与勿扰。
+
+通知插件告诉你「这轮结束了」；DSH Status 告诉你「谁在跑、谁需要你、点一下回到会话」。
+
+## 为什么选它
+
+差异在面板，不是又一个横幅。DSH Status 把会话状态常驻在 macOS 菜单栏：每会话状态、
+需要你的角标、子智能体折叠在父行下、点击回到会话。插件本身也能单独用——App 是完整体验，
+不是前置条件。
 
 想对比通知方案？见
 [DSH 通知与状态：方案对比](https://github.com/HAppy-2436/dsh-status/blob/main/docs/notifications.zh.md)。
 
-> **可选的菜单栏 App：** [下载 DSH Status](https://github.com/HAppy-2436/dsh-status/releases/latest)。
-> 不装 App 也能收基础通知；App 额外提供菜单栏面板、点击跳转、提示音与勿扰。
+> **完整体验：** [下载 DSH Status](https://github.com/HAppy-2436/dsh-status/releases/latest)。
+> 插件本身能发基础通知；App 额外提供菜单栏面板、角标、点击跳转、提示音与勿扰。
 
 ## 组成
 
@@ -36,7 +46,7 @@
 
 1. 打开 DSH：左侧边栏 **Plugins** → **Add plugin** → **Install a third-party plugin**
    → 包名输入 `dsh-status-bridge` → **Install** → **Enable now**。
-   若 registry 上没有 0.1.10 或更高版本，可在同一输入框改填 Git 地址
+   若 registry 上没有 0.1.11 或更高版本，可在同一输入框改填 Git 地址
    `github:HAppy-2436/dsh-status-bridge`。
 2. 插件激活后写 `~/.dsh-status/bridge.json`，开始发完成 / 出错 / 等待输入的 macOS 通知。
 3. **可选：** 安装 [DSH Status App](https://github.com/HAppy-2436/dsh-status/releases)
@@ -180,7 +190,7 @@ npm test
 npm publish --access public
 ```
 
-tag 必须与 `package.json` 版本一致（`v0.1.10` → `0.1.10`）。`.github/workflows/publish.yml`
+tag 必须与 `package.json` 版本一致（`v0.1.11` → `0.1.11`）。`.github/workflows/publish.yml`
 是可选自动化：在 npm Trusted Publishing 配置启用后，推 tag 即可自动发布；在那之前先本机
 发布，再推同名 tag。
 

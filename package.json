@@ -1,7 +1,7 @@
 {
   "name": "dsh-status-bridge",
-  "version": "0.1.10",
-  "description": "DSH notifications and native macOS menu bar status: get notified when a session completes, errors, or waits for approval, then jump back.",
+  "version": "0.1.11",
+  "description": "Menu bar status + notifications for DeepSeek Harness: see running and waiting sessions at a glance, and get notified when one needs you. Pairs with the free DSH Status app.",
   "type": "module",
   "license": "MIT",
   "repository": {
